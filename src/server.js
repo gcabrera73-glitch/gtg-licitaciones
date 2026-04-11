@@ -276,6 +276,18 @@ inicializarPortales().then(() => {
       }
     }, { timezone: 'America/Mexico_City' });
     console.log('Scan automático: ' + hora + ':00 hora CDMX');
+    setTimeout(()=>{
+      if(!scanEnCurso){
+        console.log('Scan inicial automático...');
+        scanEnCurso=true;
+        ultimoEstado={corriendo:true,progreso:0,total:0};
+        require('./scanner').ejecutarScan().then(r=>{
+          ultimoEstado={corriendo:false,...r};
+        }).catch(e=>{
+          ultimoEstado={corriendo:false,error:e.message};
+        }).finally(()=>{ scanEnCurso=false; });
+      }
+    }, 5000);
     setInterval(()=>{
        require('https').get('https://gtg-licitaciones.onrender.com/api/estado',()=>{});
     }, 600000);
