@@ -276,5 +276,8 @@ inicializarPortales().then(() => {
       }
     }, { timezone: 'America/Mexico_City' });
     console.log('Scan automático: ' + hora + ':00 hora CDMX');
+    setInterval(()=>{
+       require('https').get('https://gtg-licitaciones.onrender.com/api/estado',()=>{});
+    }, 600000);
   });
 });
