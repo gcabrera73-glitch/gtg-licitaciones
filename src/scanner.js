@@ -4,7 +4,7 @@ const { analizarPortal } = require('./analyzer');
 const PORTALES = require('./portales');
 const { enviarResumen } = require('./mailer');
 
-const DELAY_MS = 3000;
+const DELAY_MS = 15000;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function inicializarPortales() {
