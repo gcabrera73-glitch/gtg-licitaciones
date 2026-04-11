@@ -230,6 +230,20 @@ app.post('/api/validar/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/iniciar', (req, res) => {
+  if(scanEnCurso){ res.send('Ya hay un scan corriendo'); return; }
+  scanEnCurso=true;
+  ultimoEstado={corriendo:true,progreso:0,total:0};
+  res.send('Scan iniciado. Revisa los logs en Render.');
+  setImmediate(async()=>{
+    try{
+      const r=await require('./scanner').ejecutarScan();
+      ultimoEstado={corriendo:false,...r};
+    }catch(e){
+      ultimoEstado={corriendo:false,error:e.message};
+    }finally{ scanEnCurso=false; }
+  });
+});
 app.post('/api/scan', (req, res) => {
   if (scanEnCurso) { res.json({ ok: false, msg: 'Ya hay un scan en curso' }); return; }
   res.json({ ok: true, msg: 'Scan iniciado en segundo plano' });
