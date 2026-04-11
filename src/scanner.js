@@ -19,8 +19,8 @@ async function ejecutarScan(onProgreso) {
 
   const todos = db.prepare('SELECT * FROM portales WHERE activo=1').all();
   const portalesActivos = todos.filter(p =>
-    p.url.includes('sinaloa') || p.url.includes('guadalajara')
-  ).slice(0, 3);
+    p.url.includes('sesesp')
+  ).slice(0, 1);
   const inicio = Date.now();
   let procesados = 0, encontradas = 0, relevantes = 0;
   const nuevasRelevantes = [];
