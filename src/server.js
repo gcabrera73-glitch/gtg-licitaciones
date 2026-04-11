@@ -163,7 +163,7 @@ app.get('/iniciar', (req, res) => {
   scanEnCurso = true;
   ultimoEstado = { corriendo: true, progreso: 0, total: 0 };
   res.send('Scan iniciado OK. Cierra esta ventana y regresa al dashboard. Los resultados aparecen solos cada 30 segundos.');
-  setImmediate(async () => {
+setTimeout(async () => {
     try {
       const resultado = await ejecutarScan();
       ultimoEstado = { corriendo: false, ...resultado };
@@ -173,7 +173,7 @@ app.get('/iniciar', (req, res) => {
     } finally {
       scanEnCurso = false;
     }
-  });
+  }, 1000);
 });
 
 app.get('/api/licitaciones', (req, res) => {
