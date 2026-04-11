@@ -74,7 +74,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <h1>GTG — Monitor de Licitaciones</h1>
     <div class="sub">Redes · Telecomunicaciones · Seguridad TI</div>
   </div>
-  <button class="scan-btn" id="scan-btn" onclick="iniciarScan()">Escanear ahora</button>
+  <a href="/iniciar" style="margin-left:auto;padding:8px 16px;background:#1a1a1a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;text-decoration:none;">Escanear ahora</a>
 </div>
 <div class="main">
   <div id="status-bar" style="display:none" class="status-bar"></div>
@@ -97,10 +97,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <script>
 let todas=[];
 let filtroActual='todos';
-let pollingInterval=null;
 
 function badgeScore(s){const m={'Alto':'b-alto','Medio':'b-medio','Revisar':'b-revisar','No relevante':'b-no'};return '<span class="badge '+(m[s]||'b-no')+'">'+s+'</span>';}
-function badgeTipo(t){const m={'Servicio administrado':'b-serv','Compra de equipo':'b-compra','Mantenimiento':'b-mant'};return '<span class="badge '+(m[t]||'')+'">'+t+'</span>';}
+function badgeTipo(t){const m={'Servicio administrado':'b-serv','Compra de equipo':'b-compra','Mantenimiento':'b-mant'};return '<span class="badge '+(m[t]||'')+'\">'+t+'</span>';}
 
 function renderCard(l){
   const cls=l.score==='Alto'?'alto':l.score==='Medio'?'medio':l.score==='Revisar'?'revisar':'';
@@ -149,64 +148,32 @@ async function validar(id,valor){
   if(l){l.es_relevante=valor;mostrarFiltro();actualizarStats();}
 }
 
-function iniciarScan(){
-  const btn=document.getElementById('scan-btn');
-  const bar=document.getElementById('status-bar');
-  btn.disabled=true;
-  btn.textContent='Scan en curso...';
-  bar.className='status-bar running';
-  bar.style.display='block';
-  bar.textContent='Scan iniciado — puede tardar 20-30 minutos. La página se actualiza sola.';
-  fetch('/api/scan',{method:'POST'}).catch(()=>{});
-  iniciarPolling();
-}
-
-function iniciarPolling(){
-  if(pollingInterval)clearInterval(pollingInterval);
-  pollingInterval=setInterval(async()=>{
-    try{
-      const res=await fetch('/api/estado');
-      if(!res.ok||!res.headers.get('content-type')?.includes('application/json'))return;
-      const estado=await res.json();
-      const bar=document.getElementById('status-bar');
-      const btn=document.getElementById('scan-btn');
-      if(estado.corriendo){
-        bar.className='status-bar running';
-        bar.textContent='Scan en curso: '+estado.progreso+'/'+estado.total+' portales analizados...';
-        await cargar();
-      } else {
-        clearInterval(pollingInterval);
-        bar.className='status-bar done';
-        bar.textContent='Scan completado. Encontradas: '+(estado.encontradas||0)+', Relevantes: '+(estado.relevantes||0);
-        btn.disabled=false;
-        btn.textContent='Escanear ahora';
-        await cargar();
-      }
-    }catch(e){}
-  },15000);
-}
-
-async function verificarEstado(){
-  try{
-    const res=await fetch('/api/estado');
-    const estado=await res.json();
-    if(estado.corriendo){
-      document.getElementById('scan-btn').disabled=true;
-      document.getElementById('scan-btn').textContent='Scan en curso...';
-      const bar=document.getElementById('status-bar');
-      bar.style.display='block';
-      bar.className='status-bar running';
-      bar.textContent='Scan en curso: '+estado.progreso+'/'+estado.total+' portales...';
-      iniciarPolling();
-    }
-  }catch(e){}
-}
-
 cargar();
-verificarEstado();
+setInterval(cargar, 30000);
 </script>
 </body>
 </html>`);
+});
+
+app.get('/iniciar', (req, res) => {
+  if(scanEnCurso){
+    res.send('Ya hay un scan corriendo. Revisa los logs en Render.');
+    return;
+  }
+  scanEnCurso = true;
+  ultimoEstado = { corriendo: true, progreso: 0, total: 0 };
+  res.send('Scan iniciado OK. Cierra esta ventana y regresa al dashboard. Los resultados aparecen solos cada 30 segundos.');
+  setImmediate(async () => {
+    try {
+      const resultado = await ejecutarScan();
+      ultimoEstado = { corriendo: false, ...resultado };
+    } catch(e) {
+      console.error('Error en scan:', e.message);
+      ultimoEstado = { corriendo: false, error: e.message };
+    } finally {
+      scanEnCurso = false;
+    }
+  });
 });
 
 app.get('/api/licitaciones', (req, res) => {
@@ -220,7 +187,7 @@ app.get('/api/licitaciones', (req, res) => {
 });
 
 app.get('/api/estado', (req, res) => {
-  res.setHeader('Content-Type','application/json');
+  res.setHeader('Content-Type', 'application/json');
   res.json(ultimoEstado || { corriendo: scanEnCurso, progreso: 0, total: 0 });
 });
 
@@ -230,57 +197,18 @@ app.post('/api/validar/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/iniciar', (req, res) => {
-  if(scanEnCurso){ res.send('Ya hay un scan corriendo'); return; }
-  scanEnCurso=true;
-  ultimoEstado={corriendo:true,progreso:0,total:0};
-  res.send('Scan iniciado. Revisa los logs en Render.');
-  setImmediate(async()=>{
-    try{
-      const r=await require('./scanner').ejecutarScan();
-      ultimoEstado={corriendo:false,...r};
-    }catch(e){
-      ultimoEstado={corriendo:false,error:e.message};
-    }finally{ scanEnCurso=false; }
-  });
-});
-app.post('/api/scan', (req, res) => {
-  if (scanEnCurso) { res.json({ ok: false, msg: 'Ya hay un scan en curso' }); return; }
-  res.json({ ok: true, msg: 'Scan iniciado en segundo plano' });
-  setImmediate(async () => {
-    scanEnCurso = true;
-    ultimoEstado = { corriendo: true, progreso: 0, total: 0 };
-    try {
-      const portalesActivos = db.prepare('SELECT COUNT(*) as n FROM portales WHERE activo=1').get();
-      ultimoEstado.total = portalesActivos.n;
-
-      const originalScanner = require('./scanner');
-      const resultado = await originalScanner.ejecutarScan((progreso) => {
-        ultimoEstado.progreso = progreso;
-      });
-      ultimoEstado = { corriendo: false, ...resultado };
-    } catch (e) {
-      console.error('Error en scan:', e.message);
-      ultimoEstado = { corriendo: false, error: e.message };
-    } finally {
-      scanEnCurso = false;
-    }
-  });
-});
-
 const PORT = process.env.PORT || 3000;
 inicializarPortales().then(() => {
   app.listen(PORT, () => {
     console.log('Servidor GTG corriendo en puerto ' + PORT);
-    console.log('Dashboard: http://localhost:' + PORT);
     const hora = process.env.SCAN_HOUR || '7';
     cron.schedule('0 ' + hora + ' * * *', async () => {
       if (!scanEnCurso) {
-        console.log('Iniciando scan automático...');
+        console.log('Scan automatico diario iniciando...');
         scanEnCurso = true;
         ultimoEstado = { corriendo: true, progreso: 0, total: 0 };
         try {
-          const resultado = await require('./scanner').ejecutarScan();
+          const resultado = await ejecutarScan();
           ultimoEstado = { corriendo: false, ...resultado };
         } catch(e) {
           ultimoEstado = { corriendo: false, error: e.message };
@@ -289,21 +217,9 @@ inicializarPortales().then(() => {
         }
       }
     }, { timezone: 'America/Mexico_City' });
-    console.log('Scan automático: ' + hora + ':00 hora CDMX');
-    setTimeout(()=>{
-      if(!scanEnCurso){
-        console.log('Scan inicial automático...');
-        scanEnCurso=true;
-        ultimoEstado={corriendo:true,progreso:0,total:0};
-        require('./scanner').ejecutarScan().then(r=>{
-          ultimoEstado={corriendo:false,...r};
-        }).catch(e=>{
-          ultimoEstado={corriendo:false,error:e.message};
-        }).finally(()=>{ scanEnCurso=false; });
-      }
-    }, 5000);
-    setInterval(()=>{
-       require('https').get('https://gtg-licitaciones.onrender.com/api/estado',()=>{});
+    console.log('Scan automatico: ' + hora + ':00 hora CDMX');
+    setInterval(() => {
+      require('https').get('https://gtg-licitaciones.onrender.com/', () => {});
     }, 600000);
   });
 });
