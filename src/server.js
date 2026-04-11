@@ -149,25 +149,16 @@ async function validar(id,valor){
   if(l){l.es_relevante=valor;mostrarFiltro();actualizarStats();}
 }
 
-async function iniciarScan(){
+function iniciarScan(){
   const btn=document.getElementById('scan-btn');
   const bar=document.getElementById('status-bar');
   btn.disabled=true;
-  btn.textContent='Iniciando...';
-  try{
-    await fetch('/api/scan',{method:'POST'});
-    bar.className='status-bar running';
-    bar.style.display='block';
-    bar.textContent='Scan corriendo en segundo plano — puede tardar 20-30 minutos. La página se actualiza sola.';
-    btn.textContent='Scan en curso...';
-    iniciarPolling();
-  }catch(e){
-    bar.className='status-bar';
-    bar.style.display='block';
-    bar.textContent='Error al iniciar: '+e.message;
-    btn.disabled=false;
-    btn.textContent='Escanear ahora';
-  }
+  btn.textContent='Scan en curso...';
+  bar.className='status-bar running';
+  bar.style.display='block';
+  bar.textContent='Scan iniciado — puede tardar 20-30 minutos. La página se actualiza sola.';
+  fetch('/api/scan',{method:'POST'}).catch(()=>{});
+  iniciarPolling();
 }
 
 function iniciarPolling(){
