@@ -166,6 +166,7 @@ function iniciarPolling(){
   pollingInterval=setInterval(async()=>{
     try{
       const res=await fetch('/api/estado');
+      if(!res.ok||!res.headers.get('content-type')?.includes('application/json'))return;
       const estado=await res.json();
       const bar=document.getElementById('status-bar');
       const btn=document.getElementById('scan-btn');
@@ -219,6 +220,7 @@ app.get('/api/licitaciones', (req, res) => {
 });
 
 app.get('/api/estado', (req, res) => {
+  res.setHeader('Content-Type','application/json');
   res.json(ultimoEstado || { corriendo: scanEnCurso, progreso: 0, total: 0 });
 });
 
