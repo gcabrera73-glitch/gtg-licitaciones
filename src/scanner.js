@@ -34,7 +34,7 @@ async function ejecutarScan(onProgreso) {
       try {
         db.prepare('INSERT OR IGNORE INTO licitaciones (portal_url,portal_nombre,titulo,dependencia,tipo,score,marcas,junta_aclaraciones,fecha_entrega,fallo,justificacion,hash) VALUES (@portal_url,@portal_nombre,@titulo,@dependencia,@tipo,@score,@marcas,@junta_aclaraciones,@fecha_entrega,@fallo,@justificacion,@hash)').run(resultado);
       } catch(e) {}
-      db.prepare('UPDATE portales SET ultimo_scan=datetime("now","localtime"), total_encontradas=total_encontradas+1, total_relevantes=total_relevantes+? WHERE url=?').run(esRelevante ? 1 : 0, portal.url);
+      db.prepare("UPDATE portales SET ultimo_scan=datetime('now','localtime'), total_encontradas=total_encontradas+1, total_relevantes=total_relevantes+? WHERE url=?").run(esRelevante ? 1 : 0, portal.url);
       if (esRelevante) { relevantes++; nuevasRelevantes.push(resultado); }
     }
 
