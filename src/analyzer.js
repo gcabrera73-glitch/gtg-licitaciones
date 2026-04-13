@@ -2,13 +2,13 @@ require('dotenv').config();
 const axios = require('axios');
 const crypto = require('crypto');
 
-const GTG_SYSTEM_PROMPT = `Eres un analizador experto de licitaciones públicas para GTG, empresa de redes, telecomunicaciones y seguridad TI en CDMX.
+const GTG_SYSTEM_PROMPT = `Eres un analizador experto de licitaciones publicas para GTG, empresa de redes, telecomunicaciones y seguridad TI en CDMX.
 
 PERFIL GTG - busca esto:
 - Switches, routers, firewalls, WiFi, CCTV, videovigilancia
-- Cableado estructurado, fibra óptica, infraestructura de red
-- Mesa de ayuda, NOC, call center, soporte técnico
-- Servicio administrado, mantenimiento de red, renovación tecnológica
+- Cableado estructurado, fibra optica, infraestructura de red
+- Mesa de ayuda, NOC, call center, soporte tecnico
+- Servicio administrado, mantenimiento de red, renovacion tecnologica
 - Marcas prioritarias: Huawei, Ruckus, H3C, Ivanti, Proactivanet
 - Marcas secundarias (score Revisar): Cisco, Fortinet
 
@@ -18,8 +18,10 @@ SCORE:
 - Revisar: Cisco/Fortinet o ambiguo relevante
 - No relevante: sin relacion con TI o redes
 
-Responde SOLO con JSON valido, sin markdown ni texto extra:
-{"titulo":"texto","dependencia":"texto","tipo":"Servicio administrado|Mantenimiento|Compra de equipo|No determinado","score":"Alto|Medio|Revisar|No relevante","marcas":"texto o Ninguna","junta_aclaraciones":"fecha o No especificada","fecha_entrega":"fecha o No especificada","fallo":"fecha o No especificada","justificacion":"texto max 120 chars","total_relevantes":0}`;
+IMPORTANTE: Responde SOLO con JSON valido. Sin acentos, sin caracteres especiales en las claves. Sin markdown, sin texto extra antes o despues del JSON.
+
+Formato exacto:
+{"titulo":"texto sin acentos max 100 chars","dependencia":"texto","tipo":"Servicio administrado|Mantenimiento|Compra de equipo|No determinado","score":"Alto|Medio|Revisar|No relevante","marcas":"texto o Ninguna","junta_aclaraciones":"fecha o No especificada","fecha_entrega":"fecha o No especificada","fallo":"fecha o No especificada","justificacion":"texto max 120 chars","total_relevantes":0}`;
 
 async function fetchContenido(url) {
   try {
@@ -79,14 +81,19 @@ async function analizarPortal(url, nombrePortal) {
     const match = texto.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('Sin JSON en respuesta');
 
-    const resultado = JSON.parse(match[0]);
+    const limpio = match[0]
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ')
+      .replace(/,\s*}/g, '}')
+      .replace(/,\s*]/g, ']');
+
+    const resultado = JSON.parse(limpio);
     resultado.portal_url = url;
     resultado.portal_nombre = nombrePortal;
     resultado.hash = crypto.createHash('md5').update(url + (resultado.titulo || '')).digest('hex');
     return resultado;
 
   } catch (error) {
-    console.error('Error analizando ' + nombrePortal + ':', error.message);
+    console.error('Error analizando ' + nombrePortal + ': ' + error.message);
     return errorResult(url, nombrePortal, error.message.substring(0, 100));
   }
 }

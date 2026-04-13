@@ -17,10 +17,7 @@ async function ejecutarScan(onProgreso) {
   console.log('\n=== SCAN GTG ' + new Date().toLocaleString('es-MX') + ' ===\n');
   await inicializarPortales();
 
-  const todos = db.prepare('SELECT * FROM portales WHERE activo=1').all();
-  const portalesActivos = todos.filter(p =>
-    p.url.includes('sesesp')
-  ).slice(0, 1);
+  const portalesActivos = db.prepare('SELECT * FROM portales WHERE activo=1').all();
   const inicio = Date.now();
   let procesados = 0, encontradas = 0, relevantes = 0;
   const nuevasRelevantes = [];
@@ -37,7 +34,7 @@ async function ejecutarScan(onProgreso) {
       try {
         db.prepare('INSERT OR IGNORE INTO licitaciones (portal_url,portal_nombre,titulo,dependencia,tipo,score,marcas,junta_aclaraciones,fecha_entrega,fallo,justificacion,hash) VALUES (@portal_url,@portal_nombre,@titulo,@dependencia,@tipo,@score,@marcas,@junta_aclaraciones,@fecha_entrega,@fallo,@justificacion,@hash)').run(resultado);
       } catch(e) {}
-      db.prepare('UPDATE portales SET ultimo_scan=datetime("now","localtime"), total_encontradas=total_encontradas+1, total_relevantes=total_relevantes+? WHERE url=?').run(esRelevante?1:0, portal.url);
+      db.prepare('UPDATE portales SET ultimo_scan=datetime("now","localtime"), total_encontradas=total_encontradas+1, total_relevantes=total_relevantes+? WHERE url=?').run(esRelevante ? 1 : 0, portal.url);
       if (esRelevante) { relevantes++; nuevasRelevantes.push(resultado); }
     }
 
