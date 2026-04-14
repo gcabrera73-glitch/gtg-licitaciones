@@ -26,10 +26,31 @@ async function fetchContenido(url) {
 function limpiarJSON(texto) {
   const match = texto.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
   if (!match) return null;
-  return match[0]
-    .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ')
-    .replace(/,\s*}/g, '}')
-    .replace(/,\s*]/g, ']');
+  let s = match[0];
+  s = s.replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ');
+  s = s.replace(/,\s*}/g, '}');
+  s = s.replace(/,\s*]/g, ']');
+  s = s.replace(/([{,]\s*"[^"]+")\s*:\s*"([^"]*)(?=[^"]*"[^"]*:[^"]*})/, (m) => m);
+  try {
+    JSON.parse(s);
+    return s;
+  } catch(e) {
+    s = s.replace(/[\u00C0-\u024F]/g, (c) => {
+      const map = {'á':'a','é':'e','í':'i','ó':'o','ú':'u','ü':'u','ñ':'n','Á':'A','É':'E','Í':'I','Ó':'O','Ú':'U','Ü':'U','Ñ':'N'};
+      return map[c] || c;
+    });
+    try { JSON.parse(s); return s; } catch(e2) {
+      const m2 = s.match(/^(\{[\s\S]*\})/);
+      if (!m2) return null;
+      let truncated = m2[1];
+      const lastComma = truncated.lastIndexOf(',"');
+      if (lastComma > 0) {
+        truncated = truncated.substring(0, lastComma) + '}';
+        try { JSON.parse(truncated); return truncated; } catch(e3) { return null; }
+      }
+      return null;
+    }
+  }
 }
 
 async function llamarIA(prompt, maxTokens = 800) {
