@@ -26,7 +26,8 @@ db.exec(`
     validado INTEGER DEFAULT 0,
     es_relevante INTEGER DEFAULT NULL,
     fecha_deteccion TEXT DEFAULT (datetime('now','localtime')),
-    hash TEXT UNIQUE
+    hash TEXT UNIQUE,
+    comentario TEXT
   );
 
   CREATE TABLE IF NOT EXISTS portales (

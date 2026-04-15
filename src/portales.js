@@ -6,10 +6,10 @@ const PORTALES = [
   { url: 'https://concursodigital.finanzas.cdmx.gob.mx/convocatorias_publicas#middle', nombre: 'Concurso Digital CDMX', categoria: 'CDMX' },
   { url: 'https://www.c5.cdmx.gob.mx/convocatorias/licitaciones', nombre: 'C5 CDMX', categoria: 'CDMX' },
   { url: 'https://portalanterior.ine.mx/archivos3/portal/historico/contenido/interiores/Menu_Principal-id-9db0c2ec3d355010VgnVCM1000002c01000aRCRD/', nombre: 'INE', categoria: 'Federal' },
-  { url: 'https://fonacot.gob.mx/nosotros/basesLicitaciones/licitacionespublicas/2022/Paginas/Proyecto-de-Bases.aspx', nombre: 'FONACOT', categoria: 'Federal' },
+  // { url: 'https://fonacot.gob.mx/nosotros/basesLicitaciones/licitacionespublicas/2022/Paginas/Proyecto-de-Bases.aspx', nombre: 'FONACOT', categoria: 'Federal' }, // historial 2022
 
   // SECTOR SALUD
-  { url: 'http://hjm.salud.gob.mx/interna/licitaciones/licitaciones.html', nombre: 'Hospital Juárez de México', categoria: 'Salud' },
+  // { url: 'http://hjm.salud.gob.mx/interna/licitaciones/licitaciones.html', nombre: 'Hospital Juárez de México', categoria: 'Salud' }, // portal abandonado
   { url: 'https://www.pediatria.gob.mx/interna/licita.html', nombre: 'Hospital Infantil de México', categoria: 'Salud' },
   { url: 'https://cibnor.mx/proyectos-y-convocatorias-licitacion-laassp-lopsrm', nombre: 'CIBNOR', categoria: 'Salud' },
 
@@ -36,10 +36,10 @@ const PORTALES = [
   { url: 'https://www.oaxaca.gob.mx/administracion/licitaciones/', nombre: 'Oaxaca', categoria: 'Estado' },
   { url: 'https://licitaciones.puebla.gob.mx/', nombre: 'Puebla', categoria: 'Estado' },
   { url: 'https://licitaciones.puebla.gob.mx/index.php/aquisiciones-bienes-y-servicios/convocatorias-aquisiciones-bienes-y-servicios', nombre: 'Puebla Adquisiciones', categoria: 'Estado' },
-  { url: 'https://municipiodequeretaro.gob.mx/licitaciones/publicas-municipales/', nombre: 'Querétaro Municipal', categoria: 'Municipio' },
-  { url: 'https://municipiodequeretaro.gob.mx/licitaciones/publicas-nacionales/', nombre: 'Querétaro Nacional', categoria: 'Municipio' },
-  { url: 'https://municipiodequeretaro.gob.mx/licitaciones/federales/', nombre: 'Querétaro Federales', categoria: 'Municipio' },
-  { url: 'https://qroo.gob.mx/sema/licitaciones/', nombre: 'Quintana Roo', categoria: 'Estado' },
+  // { url: 'https://municipiodequeretaro.gob.mx/licitaciones/publicas-municipales/', nombre: 'Querétaro Municipal', categoria: 'Municipio' }, // solo historial
+  // { url: 'https://municipiodequeretaro.gob.mx/licitaciones/publicas-nacionales/', nombre: 'Querétaro Nacional', categoria: 'Municipio' }, // solo historial
+  // { url: 'https://municipiodequeretaro.gob.mx/licitaciones/federales/', nombre: 'Querétaro Federales', categoria: 'Municipio' }, // solo historial
+  // { url: 'https://qroo.gob.mx/sema/licitaciones/', nombre: 'Quintana Roo', categoria: 'Estado' }, // solo historial
   { url: 'https://sitio.sanluis.gob.mx/SanLuisPotoSi/LicitacionesPublicas2', nombre: 'San Luis Potosí', categoria: 'Estado' },
   { url: 'https://sitio.sanluis.gob.mx/SanLuisPotoSi/Compras2', nombre: 'San Luis Potosí Compras', categoria: 'Estado' },
   { url: 'https://compranet.sinaloa.gob.mx/secretaria-de-administracion-y-finanzas-ges', nombre: 'Sinaloa Adm. General', categoria: 'Estado' },
@@ -60,11 +60,11 @@ const PORTALES = [
   { url: 'https://edomex.gob.mx/licitaciones_enlinea', nombre: 'Estado de México', categoria: 'Estado' },
   { url: 'https://oficialiamayor.edomex.gob.mx/licitaciones-abiertas', nombre: 'EDOMEX Oficialía Mayor', categoria: 'Estado' },
   { url: 'https://transparenciafiscal.edomex.gob.mx/convocatorias_licitaciones', nombre: 'EDOMEX Transparencia Fiscal', categoria: 'Estado' },
-  { url: 'https://dapi.buap.mx/licitaciones', nombre: 'BUAP', categoria: 'Universidad' },
 
   // UNIVERSIDADES
   { url: 'https://www.proveeduria.unam.mx/app.dgpr/', nombre: 'UNAM', categoria: 'Universidad' },
   { url: 'https://cgsait.udg.mx/csg/licitaciones', nombre: 'UdeG', categoria: 'Universidad' },
+  { url: 'https://dapi.buap.mx/licitaciones', nombre: 'BUAP', categoria: 'Universidad' },
   { url: 'https://www.uaeh.edu.mx/transparencia/proyectos-obras-licitaciones/lic2026.html', nombre: 'UAEH', categoria: 'Universidad' },
   { url: 'https://intranet2.ugto.mx/AdquisicionesUG/adquisiciones/documentos?tab=0', nombre: 'Universidad de Guanajuato', categoria: 'Universidad' },
   { url: 'https://umich.mx/convocatorias/', nombre: 'UMICH', categoria: 'Universidad' },

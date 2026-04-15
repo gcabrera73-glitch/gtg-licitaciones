@@ -143,11 +143,10 @@ GTG busca: switches, routers, firewalls, WiFi, CCTV, videovigilancia, cableado e
 Marcas prioritarias: Huawei, Ruckus, H3C, Ivanti, Proactivanet. Marcas secundarias (score Revisar): Cisco, Fortinet.
 ${criteriosExtra ? 'APRENDIZAJE - palabras con mayor relevancia: ' + criteriosExtra : ''}
 
-FILTROS:
-- Incluye licitaciones de ${AÑO_ACTUAL} y ${AÑO_ACTUAL - 1}
-- SOLO descarta si el titulo o numero contiene explicitamente "2024" o anterior
-- Si no hay año visible, incluye la licitacion
-- NO incluyas licitaciones de limpieza, alimentos, uniformes, vehiculos, obras civiles, medicamentos
+REGLAS:
+- Incluye TODAS las licitaciones relevantes de TI/redes que encuentres, sin limite de cantidad
+- SOLO descarta si el titulo contiene explicitamente "2024" o anterior
+- NO incluyas: limpieza, alimentos, uniformes, vehiculos, obras civiles, papeleria, medicamentos, seguros, combustible
 
 Portal: ${nombre}
 URL: ${url}
@@ -168,26 +167,18 @@ Responde SOLO con JSON valido sin texto extra:
 }
 Si no hay relevantes: {"total_relevantes": 0, "licitaciones": []}`;
 
-const PROMPT_DETALLE = (url, nombre, contenido) => `Analiza esta pagina de licitaciones publicas para GTG (empresa de redes TI en Mexico).
+const PROMPT_DETALLE = (url, nombre, contenido) => `Analiza esta pagina de licitaciones para GTG (empresa de redes TI en Mexico).
 
-IMPORTANTE: Esta pagina puede contener UNA o VARIAS licitaciones. Extrae TODAS las que sean relevantes para GTG.
-
+Esta pagina puede tener UNA o VARIAS licitaciones. Extrae TODAS las relevantes para GTG.
 GTG busca: telecomunicaciones, redes, WiFi, fibra optica, CCTV, switches, routers, firewalls, NOC, soporte tecnico, servicio administrado, mantenimiento TI.
 NO es relevante: limpieza, alimentos, uniformes, vehiculos, obras civiles, papeleria, medicamentos.
 
-Para cada licitacion relevante extrae:
-- titulo completo
-- numero de licitacion
-- dependencia
-- tipo: Servicio administrado | Mantenimiento | Compra de equipo | No determinado
-- score: Alto | Medio | Revisar
-- marcas detectadas
-- Junta de aclaraciones (busca "Junta de aclaraciones", "Aclaración de bases")
-- Entrega/Apertura de propuestas (busca "Acto de presentacion", "Apertura de proposiciones", "Entrega de propuestas")  
-- Fallo (busca "Acto de fallo", "Comunicacion de fallo")
-- justificacion del score
+Para cada licitacion extrae las fechas buscando estos patrones exactos:
+- "Junta de aclaraciones" o "Aclaracion de bases" -> campo junta_aclaraciones
+- "Acto de presentacion", "Apertura de proposiciones", "Entrega de propuestas" -> campo fecha_entrega  
+- "Acto de fallo", "Comunicacion de fallo", "Fallo" -> campo fallo
 
-Fecha de hoy: ${HOY.toLocaleDateString('es-MX')}. Si el fallo ya paso, igual incluye pero marca en justificacion "Fallo ya vencido".
+Fecha de hoy: ${HOY.toLocaleDateString('es-MX')}.
 
 Portal: ${nombre}
 URL: ${url}
@@ -243,11 +234,17 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
 
     console.log('  ' + nombrePortal + ': ' + licitaciones.length + ' relevantes detectadas');
 
-    const urlsUnicas = [...new Set(licitaciones.map(l => l.url_detalle).filter(u => u && u !== 'null' && u.startsWith('http')))];
-    const urlsConDetalle = urlsUnicas.slice(0, 8);
-    const licitacionesSinUrl = licitaciones.filter(l => !l.url_detalle || l.url_detalle === 'null' || !l.url_detalle.startsWith('http'));
+    const urlsUnicas = [...new Set(
+      licitaciones
+        .map(l => l.url_detalle)
+        .filter(u => u && u !== 'null' && u.startsWith('http'))
+    )];
 
-    for (const urlDetalle of urlsConDetalle) {
+    const licitacionesSinUrl = licitaciones.filter(
+      l => !l.url_detalle || l.url_detalle === 'null' || !l.url_detalle.startsWith('http')
+    );
+
+    for (const urlDetalle of urlsUnicas) {
       await new Promise(r => setTimeout(r, 3000));
       try {
         const contenidoDetalle = await fetchContenido(urlDetalle);
@@ -265,15 +262,15 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
 
         for (const lic of lics) {
           if (!lic.titulo || lic.score === 'No relevante') continue;
-
           if (licitacionVencida(lic)) {
             console.log('  Vencida: ' + (lic.titulo || '').substring(0, 50));
             continue;
           }
-
           lic.portal_url = urlDetalle;
           lic.portal_nombre = nombrePortal;
-          lic.hash = crypto.createHash('md5').update(urlDetalle + (lic.titulo || '')).digest('hex');
+          lic.hash = crypto.createHash('md5')
+            .update(urlDetalle + (lic.titulo || '') + (lic.numero_licitacion || ''))
+            .digest('hex');
           resultados.push(lic);
         }
       } catch(e) {
@@ -295,7 +292,9 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
         numero_licitacion: 'No especificado',
         portal_url: url,
         portal_nombre: nombrePortal,
-        hash: crypto.createHash('md5').update(url + (lic.titulo || '') + Date.now().toString()).digest('hex'),
+        hash: crypto.createHash('md5')
+          .update(url + (lic.titulo || '') + Date.now().toString())
+          .digest('hex'),
       });
     }
 
