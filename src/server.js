@@ -268,7 +268,6 @@ app.get('/api/licitaciones', (req, res) => {
     SELECT * FROM licitaciones
     WHERE score != 'No relevante' AND score != 'Error'
     ORDER BY
-      CASE WHEN es_relevante IS NULL THEN 0 ELSE 1 END,
       CASE score WHEN 'Alto' THEN 1 WHEN 'Medio' THEN 2 WHEN 'Revisar' THEN 3 ELSE 4 END,
       fecha_deteccion DESC
   `).all();
