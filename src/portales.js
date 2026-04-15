@@ -26,7 +26,7 @@ const PORTALES = [
   { url: 'https://compranet.guerrero.gob.mx/expedientespublicos.aspx', nombre: 'Guerrero', categoria: 'Estado' },
   { url: 'https://eoficialia.hidalgo.gob.mx/LICITACIONES/VISTAS/WebFrmLC004.aspx', nombre: 'Hidalgo', categoria: 'Estado' },
   { url: 'https://oficialiamayor.hidalgo.gob.mx/Licitaciones', nombre: 'Hidalgo Oficialía Mayor', categoria: 'Estado' },
-  { url: 'https://compras.jalisco.gob.mx/requisition/tree', nombre: 'Jalisco', categoria: 'Estado' },
+  { url: 'https://compras.jalisco.gob.mx/requisition/tree?group=007', nombre: 'Jalisco TI', categoria: 'Estado' },
   { url: 'https://transparencia.guadalajara.gob.mx/licitaciones2025', nombre: 'Guadalajara Municipio', categoria: 'Municipio' },
   { url: 'https://sip.cadpe.michoacan.gob.mx/CADPE/#/procedimientos', nombre: 'Michoacán', categoria: 'Estado' },
   { url: 'https://compras.morelos.gob.mx/licitaciones-2025', nombre: 'Morelos', categoria: 'Estado' },
@@ -58,7 +58,7 @@ const PORTALES = [
   { url: 'https://adquisiciones.yucatan.gob.mx/#/concursos-electronicos', nombre: 'Yucatán Electrónico', categoria: 'Estado' },
   { url: 'https://funcionpublica.zacatecas.gob.mx/licitaciones', nombre: 'Zacatecas', categoria: 'Estado' },
   { url: 'https://edomex.gob.mx/licitaciones_enlinea', nombre: 'Estado de México', categoria: 'Estado' },
-  { url: 'https://oficialiamayor.edomex.gob.mx/licitaciones-abiertas', nombre: 'EDOMEX Oficialía Mayor', categoria: 'Estado' },
+  { url: 'https://compramex.edomex.gob.mx/compramex/public/catalogosExternos/procedimientsoAdquisitivos.xhtml', nombre: 'EDOMEX COMPRAMEX', categoria: 'Estado' },
   { url: 'https://transparenciafiscal.edomex.gob.mx/convocatorias_licitaciones', nombre: 'EDOMEX Transparencia Fiscal', categoria: 'Estado' },
 
   // UNIVERSIDADES
