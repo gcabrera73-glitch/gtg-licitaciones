@@ -148,6 +148,11 @@ REGLAS:
 - SOLO descarta si el titulo contiene explicitamente "2024" o anterior
 - NO incluyas: limpieza, alimentos, uniformes, vehiculos, obras civiles, papeleria, medicamentos, seguros, combustible
 
+IMPORTANTE PARA url_detalle:
+- Si la pagina tiene links a licitaciones individuales, usa esa URL
+- Si la pagina es una tabla con documentos PDF por licitacion (como Sinaloa), usa el link del PDF de "RESUMEN DE CONVOCATORIA" o "JUNTA DE ACLARACIONES" como url_detalle
+- Si no hay ninguna URL especifica, usa null
+
 Portal: ${nombre}
 URL: ${url}
 Contenido:
@@ -159,7 +164,7 @@ Responde SOLO con JSON valido sin texto extra:
   "licitaciones": [
     {
       "titulo": "titulo de la licitacion",
-      "url_detalle": "url completa o null",
+      "url_detalle": "url completa al detalle o PDF de convocatoria o null",
       "score_preliminar": "Alto|Medio|Revisar",
       "resumen": "descripcion max 100 chars"
     }
