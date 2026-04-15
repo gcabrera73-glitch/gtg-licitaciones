@@ -185,10 +185,16 @@ async function resetEval(id) {
 async function cargar(){
   try{
     const res = await fetch('/api/licitaciones');
-    todas = await res.json();
+    if(!res.ok){ document.getElementById('lista').innerHTML='<div class="empty">Error: '+res.status+'</div>'; return; }
+    const data = await res.json();
+    if(!Array.isArray(data)){ document.getElementById('lista').innerHTML='<div class="empty">Error: respuesta no es array</div>'; return; }
+    todas = data;
     actualizarStats();
     mostrarFiltro();
-  }catch(e){console.error(e);}
+  }catch(e){
+    document.getElementById('lista').innerHTML='<div class="empty">Error: '+e.message+'</div>';
+    console.error(e);
+  }
 }
 
 function actualizarStats(){
