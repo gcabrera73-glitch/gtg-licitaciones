@@ -10,10 +10,6 @@ app.use(express.json());
 let scanEnCurso = false;
 let ultimoEstado = null;
 
-db.exec(`
-  ALTER TABLE licitaciones ADD COLUMN comentario TEXT;
-`).catch ? null : null;
-
 try { db.exec('ALTER TABLE licitaciones ADD COLUMN comentario TEXT;'); } catch(e) {}
 
 app.get('/', (req, res) => {
