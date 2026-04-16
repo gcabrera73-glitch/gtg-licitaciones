@@ -244,8 +244,27 @@ function setBusqueda(palabra) {
   mostrarFiltro();
 }
 
-cargar();
-setInterval(cargar, 60000);
+// Cargar datos al inicio
+window.onload = function() {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', '/api/licitaciones', true);
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState === 4) {
+      if (xhr.status === 200) {
+        try {
+          todas = JSON.parse(xhr.responseText);
+          actualizarStats();
+          mostrarFiltro();
+        } catch(e) {
+          document.getElementById('lista').innerHTML = '<div class="empty">Error parseando datos: ' + e.message + '</div>';
+        }
+      } else {
+        document.getElementById('lista').innerHTML = '<div class="empty">Error ' + xhr.status + ' cargando datos</div>';
+      }
+    }
+  };
+  xhr.send();
+};
 </script>
 </body>
 </html>`);
