@@ -143,10 +143,12 @@ GTG busca: switches, routers, firewalls, WiFi, CCTV, videovigilancia, cableado e
 Marcas prioritarias: Huawei, Ruckus, H3C, Ivanti, Proactivanet. Marcas secundarias (score Revisar): Cisco, Fortinet.
 ${criteriosExtra ? 'APRENDIZAJE - palabras con mayor relevancia: ' + criteriosExtra : ''}
 
-REGLAS:
-- Incluye TODAS las licitaciones relevantes de TI/redes que encuentres, sin limite de cantidad
-- SOLO descarta si el titulo contiene explicitamente "2024" o anterior
+REGLAS ESTRICTAS:
+- Incluye SOLO licitaciones de 2026 — descarta cualquier cosa con /2025, /2024 o año anterior en el numero o titulo
+- Si el numero de licitacion contiene "2025" o "2024" (ej: SESESP 02/2025, LPL 123/2025) = DESCARTAR
+- Si el titulo dice "adjudicada", "fallo", "desierta", "cancelada" = DESCARTAR
 - NO incluyas: limpieza, alimentos, uniformes, vehiculos, obras civiles, papeleria, medicamentos, seguros, combustible
+- Solo incluye licitaciones que claramente sean de 2026 o cuyo año no sea visible
 
 IMPORTANTE PARA url_detalle:
 - Si la pagina tiene links a licitaciones individuales, usa esa URL
