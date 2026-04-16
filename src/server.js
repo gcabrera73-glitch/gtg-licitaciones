@@ -288,6 +288,20 @@ function guardar(id) {
 </html>`);
 });
 
+app.get('/limpiar', (req, res) => {
+  // Eliminar duplicados - mantener solo el mas reciente por titulo+portal
+  db.exec(`
+    DELETE FROM licitaciones WHERE id NOT IN (
+      SELECT MAX(id) FROM licitaciones
+      GROUP BY titulo, portal_nombre
+    )
+  `);
+  // Eliminar licitaciones con score Error
+  db.exec("DELETE FROM licitaciones WHERE score='Error'");
+  const total = db.prepare('SELECT COUNT(*) as n FROM licitaciones').get().n;
+  res.send('Limpieza completada. Licitaciones restantes: ' + total + '. <a href="/">Ver dashboard</a>');
+});
+
 const PORT = process.env.PORT || 3000;
 inicializarPortales().then(() => {
   app.listen(PORT, () => {
