@@ -182,19 +182,17 @@ async function resetEval(id) {
   if(l){ l.es_relevante=null; l.comentario=''; mostrarFiltro(); actualizarStats(); }
 }
 
-async function cargar(){
-  try{
-    const res = await fetch('/api/licitaciones');
-    if(!res.ok){ document.getElementById('lista').innerHTML='<div class="empty">Error: '+res.status+'</div>'; return; }
-    const data = await res.json();
-    if(!Array.isArray(data)){ document.getElementById('lista').innerHTML='<div class="empty">Error: respuesta no es array</div>'; return; }
-    todas = data;
-    actualizarStats();
-    mostrarFiltro();
-  }catch(e){
-    document.getElementById('lista').innerHTML='<div class="empty">Error: '+e.message+'</div>';
-    console.error(e);
-  }
+function cargar(){
+  fetch('/api/licitaciones')
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      todas = Array.isArray(data) ? data : [];
+      actualizarStats();
+      mostrarFiltro();
+    })
+    .catch(function(e){
+      document.getElementById('lista').innerHTML='<div class="empty">Error cargando: '+e.message+'</div>';
+    });
 }
 
 function actualizarStats(){
