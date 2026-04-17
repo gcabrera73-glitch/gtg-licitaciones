@@ -269,6 +269,7 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
 
         for (const lic of lics) {
           if (!lic.titulo || lic.score === 'No relevante') continue;
+          console.log('  Fechas extraidas - Fallo: ' + lic.fallo + ' | Entrega: ' + lic.fecha_entrega);
           if (licitacionVencida(lic)) {
             console.log('  Vencida: ' + (lic.titulo || '').substring(0, 50));
             continue;
