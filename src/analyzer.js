@@ -79,6 +79,16 @@ async function fetchContenido(url) {
 
     if (links.length > 0) {
       texto += '\n\nPDFs en esta pagina: ' + links.slice(0, 5).join(', ');
+      // Si la pagina tiene poco texto util, intentar leer el primer PDF de convocatoria
+      const convPdf = links.find(l => /convocatoria|resumen|bases/i.test(l));
+      if (convPdf && texto.length < 2000) {
+        try {
+          const pdfResp = await axios.get(convPdf, { timeout: 20000, headers: HEADERS, responseType: 'arraybuffer' });
+          const pdfParse = require('pdf-parse');
+          const pdfData = await pdfParse(pdfResp.data);
+          texto += '\n\nCONTENIDO PDF CONVOCATORIA:\n' + pdfData.text.substring(0, 6000);
+        } catch(e) {}
+      }
     }
     return texto;
   } catch (e) {
