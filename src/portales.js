@@ -1,8 +1,8 @@
 const PORTALES = [
   // FEDERALES Y CDMX
-  { url: 'https://upcp-compranet.buengobierno.gob.mx/sitiopublico/', nombre: 'ComprasMX (CompraNet Federal)', categoria: 'Federal' },
-  { url: 'https://dof.gob.mx/#gsc.tab=0', nombre: 'Diario Oficial de la Federación', categoria: 'Federal' },
-  { url: 'https://comprasmx.buengobierno.gob.mx/panel/#/', nombre: 'ComprasMX Panel', categoria: 'Federal' },
+  { url: 'COMPRASMX_API:telecomunicaciones', nombre: 'ComprasMX Telecom', categoria: 'Federal' },
+  { url: 'COMPRASMX_API:redes computo', nombre: 'ComprasMX Redes TI', categoria: 'Federal' },
+  { url: 'COMPRASMX_API:videovigilancia seguridad', nombre: 'ComprasMX Videovigilancia', categoria: 'Federal' },
   { url: 'https://concursodigital.finanzas.cdmx.gob.mx/convocatorias_publicas#middle', nombre: 'Concurso Digital CDMX', categoria: 'CDMX' },
   { url: 'https://www.c5.cdmx.gob.mx/convocatorias/licitaciones', nombre: 'C5 CDMX', categoria: 'CDMX' },
   { url: 'https://portalanterior.ine.mx/archivos3/portal/historico/contenido/interiores/Menu_Principal-id-9db0c2ec3d355010VgnVCM1000002c01000aRCRD/', nombre: 'INE', categoria: 'Federal' },

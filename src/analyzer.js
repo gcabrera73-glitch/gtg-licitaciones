@@ -245,7 +245,110 @@ Responde SOLO con JSON valido:
   ]
 }`;
 
+
+async function consultarComprasMX(keywords) {
+  const resultados = [];
+  try {
+    const response = await axios.post(
+      'https://upcp-cnetservicios.buengobierno.gob.mx/whitney/sitiopublico/expedientes?rows=100&page=1',
+      {
+        id_ley: null,
+        id_tipo_procedimiento: null,
+        id_tipo_contratacion: null,
+        fecha_apertura_inicio: null,
+        fecha_apertura_fin: null,
+        fecha_publicacion_inicio: null,
+        fecha_publicacion_fin: null,
+        id_estatus: 1,
+        id_proceso: 0,
+        nombre_procedimiento: keywords,
+        numero_procedimiento: null,
+        id_entidad_federativa: [],
+        id_tipo_dependencia: [],
+        id_p_especifica: [],
+        estatus_alterno: [],
+        compra_consolidada: false,
+        credito_externo: null,
+        exclusivo_mipymes: null,
+        id_caracter_procedimiento: null,
+        id_forma_participacion: null,
+        codigo_expediente: null,
+        codigo_procedimiento: null
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Origin': 'https://upcp-compranet.buengobierno.gob.mx',
+          'Referer': 'https://upcp-compranet.buengobierno.gob.mx/'
+        },
+        timeout: 30000
+      }
+    );
+
+    const data = response.data;
+    const expedientes = data.data || data.expedientes || data.results || data || [];
+    const lista = Array.isArray(expedientes) ? expedientes : [];
+
+    for (const exp of lista) {
+      const titulo = exp.nombre_procedimiento || exp.titulo || exp.descripcion || '';
+      const numero = exp.numero_procedimiento || exp.codigo_procedimiento || '';
+      const dependencia = exp.nombre_dependencia || exp.institucion || exp.unidad_compradora || '';
+      const fechaApertura = exp.fecha_apertura_proposiciones || exp.fecha_apertura || '';
+      const fechaFallo = exp.fecha_fallo || '';
+      const fechaJunta = exp.fecha_junta_aclaraciones || '';
+      const urlDetalle = exp.id_expediente ?
+        'https://upcp-compranet.buengobierno.gob.mx/sitiopublico/#/sitiopublico/detalle/' + exp.id_expediente + '/procedimiento' :
+        'https://upcp-compranet.buengobierno.gob.mx/sitiopublico/';
+
+      resultados.push({
+        titulo: titulo,
+        dependencia: dependencia,
+        tipo: 'No determinado',
+        score: 'Revisar',
+        marcas: 'Ninguna',
+        junta_aclaraciones: fechaJunta || 'No especificada',
+        fecha_entrega: fechaApertura || 'No especificada',
+        fallo: fechaFallo || 'No especificada',
+        justificacion: 'Licitacion vigente en ComprasMX: ' + keywords,
+        numero_licitacion: numero,
+        portal_url: urlDetalle,
+        portal_nombre: 'ComprasMX Federal',
+        hash: crypto.createHash('md5').update('comprasmx' + (numero || titulo)).digest('hex')
+      });
+    }
+    console.log('  ComprasMX [' + keywords + ']: ' + resultados.length + ' resultados');
+  } catch(e) {
+    console.log('  Error ComprasMX: ' + e.message.substring(0, 80));
+  }
+  return resultados;
+}
+
 async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
+  // Manejo especial para API de ComprasMX
+  if (url.startsWith('COMPRASMX_API:')) {
+    const keywords = url.replace('COMPRASMX_API:', '');
+    const resultados = await consultarComprasMX(keywords);
+    // Filtrar con IA para asignar score correcto
+    const relevantes = [];
+    for (const r of resultados) {
+      const tituloLower = r.titulo.toLowerCase();
+      const palabrasGTG = ['telecomunicacion','telecom','red ','redes','switch','router','firewall','wifi','cctv','videovigilancia','fibra optica','noc','mesa de ayuda','soporte tecnico','mantenimiento','infraestructura ti','computo','ciberseguridad','huawei','cisco','fortinet','ruckus'];
+      const relevante = palabrasGTG.some(p => tituloLower.includes(p));
+      if (relevante) {
+        r.score = 'Medio';
+        // Verificar si está vencida
+        if (!licitacionVencida(r)) {
+          relevantes.push(r);
+        } else {
+          console.log('  Vencida ComprasMX: ' + r.titulo.substring(0, 50));
+        }
+      }
+    }
+    console.log('  ' + nombrePortal + ': ' + relevantes.length + ' relevantes de ' + resultados.length);
+    return relevantes;
+  }
+
   const resultados = [];
 
   try {
