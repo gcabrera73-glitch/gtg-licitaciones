@@ -1,7 +1,7 @@
 {
   "name": "gtg-licitaciones",
   "version": "1.0.0",
-  "description": "Sistema de monitoreo de licitaciones públicas para GTG",
+  "description": "Sistema de monitoreo de licitaciones p\u00fablicas para GTG",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
@@ -15,6 +15,7 @@
     "nodemailer": "^6.9.7",
     "better-sqlite3": "^9.4.3",
     "dotenv": "^16.3.1",
-    "pdf-parse": "^1.1.1"
+    "pdf-parse": "^1.1.1",
+    "mammoth": "^1.6.0"
   }
 }
