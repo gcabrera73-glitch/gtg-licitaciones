@@ -60,13 +60,34 @@ async function ejecutarScan(onProgreso) {
       const esRevisar = resultado.score === 'Revisar';
 
       try {
-        db.prepare(`INSERT OR IGNORE INTO licitaciones
-          (portal_url, portal_nombre, titulo, dependencia, tipo, score, marcas,
-           junta_aclaraciones, fecha_entrega, fallo, justificacion, hash)
-          VALUES
-          (@portal_url, @portal_nombre, @titulo, @dependencia, @tipo, @score, @marcas,
-           @junta_aclaraciones, @fecha_entrega, @fallo, @justificacion, @hash)
-        `).run(resultado);
+        const existe = db.prepare('SELECT id, junta_aclaraciones, fecha_entrega, fallo FROM licitaciones WHERE hash=?').get(resultado.hash);
+        if (!existe) {
+          db.prepare(`INSERT INTO licitaciones
+            (portal_url, portal_nombre, titulo, dependencia, tipo, score, marcas,
+             junta_aclaraciones, fecha_entrega, fallo, justificacion, hash)
+            VALUES
+            (@portal_url, @portal_nombre, @titulo, @dependencia, @tipo, @score, @marcas,
+             @junta_aclaraciones, @fecha_entrega, @fallo, @justificacion, @hash)
+          `).run(resultado);
+        } else {
+          // Actualizar fechas si el nuevo scan las tiene y antes no
+          const tieneFechasNuevas = 
+            (resultado.junta_aclaraciones && resultado.junta_aclaraciones !== 'No especificada') ||
+            (resultado.fecha_entrega && resultado.fecha_entrega !== 'No especificada') ||
+            (resultado.fallo && resultado.fallo !== 'No especificada');
+          const noTeniaFechas = 
+            (!existe.junta_aclaraciones || existe.junta_aclaraciones === 'No especificada') &&
+            (!existe.fecha_entrega || existe.fecha_entrega === 'No especificada') &&
+            (!existe.fallo || existe.fallo === 'No especificada');
+          if (tieneFechasNuevas && noTeniaFechas) {
+            db.prepare(`UPDATE licitaciones SET 
+              junta_aclaraciones=?, fecha_entrega=?, fallo=?, score=?
+              WHERE hash=?`).run(
+              resultado.junta_aclaraciones, resultado.fecha_entrega, 
+              resultado.fallo, resultado.score, resultado.hash
+            );
+          }
+        }
       } catch(e) {}
 
       if (esRelevante) {
