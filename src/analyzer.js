@@ -77,8 +77,23 @@ async function fetchContenido(url) {
       try {
         const pdfParse = require('pdf-parse');
         const data = await pdfParse(response.data);
-        return data.text.substring(0, 12000);
+        if (data.text && data.text.trim().length > 100) {
+          return data.text.substring(0, 12000);
+        }
+        return null; // PDF escaneado sin texto
       } catch(e) { return null; }
+    }
+
+    // Leer DOCX
+    if (url.endsWith('.docx') || contentType.includes('officedocument')) {
+      try {
+        const mammoth = require('mammoth');
+        const result = await mammoth.extractRawText({ buffer: Buffer.from(response.data) });
+        if (result.value && result.value.trim().length > 50) {
+          return result.value.substring(0, 12000);
+        }
+      } catch(e) {}
+      return null;
     }
 
     const html = Buffer.from(response.data).toString('utf-8');
@@ -190,9 +205,15 @@ REGLAS:
 - NO incluyas: limpieza, alimentos, uniformes, vehiculos, obras civiles, papeleria, medicamentos, seguros, combustible
 
 IMPORTANTE PARA url_detalle:
-- Si hay links a PDFs de convocatoria o resumen, usa ese PDF como url_detalle
-- Si hay links a paginas individuales de licitacion, usa esa URL
+- Si hay links a licitaciones individuales, usa esa URL
+- Si la pagina es tipo Sinaloa (tabla con columnas Junta/Apertura/Fallo), usa null — las fechas se determinan por presencia de documentos
 - Si no hay URL especifica, usa null
+
+PARA PORTALES TIPO SINALOA (tabla con documentos por columna):
+- Si la licitacion tiene columna FALLO con documento = ya adjudicada, DESCARTAR
+- Si la licitacion NO tiene FALLO pero tiene ACTA APERTURA = proceso cerrado, DESCARTAR  
+- Si la licitacion solo tiene CONVOCATORIA sin actas = VIGENTE, incluir
+- Extrae la descripcion completa de la licitacion como resumen
 
 Portal: ${nombre}
 URL: ${url}
