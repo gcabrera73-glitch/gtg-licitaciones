@@ -345,6 +345,109 @@ async function consultarComprasMX(keywords) {
   return resultados;
 }
 
+
+async function analizarSinaloa(url, nombrePortal, htmlContenido) {
+  const resultados = [];
+  const HOY_TS = HOY.getTime();
+
+  // Extraer tabla de licitaciones del HTML
+  // Buscar filas que contengan palabras clave de TI
+  const palabrasTI = ['telecomunicacion', 'internet', 'red ', 'redes', 'computo', 'tecnologia',
+    'firewall', 'switch', 'router', 'wifi', 'cctv', 'videovigilancia', 'fibra', 'noc',
+    'soporte tecnico', 'mantenimiento.*equipo', 'infraestructura'];
+
+  // Extraer links de DOCX/PDF de convocatoria del HTML original
+  // Necesitamos el HTML completo, no el texto
+  try {
+    const response = await axios.get(url, {
+      timeout: 25000, headers: HEADERS, maxRedirects: 5,
+      responseType: 'arraybuffer'
+    });
+    const html = Buffer.from(response.data).toString('utf-8');
+
+    // Dividir por filas de tabla (cada licitacion es una fila)
+    const filas = html.split('<tr').slice(1);
+
+    for (const fila of filas) {
+      // Verificar si contiene palabras de TI
+      const filaLower = fila.toLowerCase()
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ');
+
+      const esTI = palabrasTI.some(p => new RegExp(p, 'i').test(filaLower));
+      if (!esTI) continue;
+
+      // Verificar si ya tiene FALLO (adjudicada)
+      if (fila.toLowerCase().includes('acta de fallo') || fila.toLowerCase().includes('acta_de_fallo')) {
+        continue; // Ya adjudicada, saltar
+      }
+
+      // Extraer titulo
+      const tituloMatch = fila.match(/<td[^>]*>([^<]{20,200})<\/td>/);
+      const titulo = tituloMatch ? tituloMatch[1].trim() : 'Licitacion Sinaloa';
+
+      // Buscar link a DOCX de resumen de convocatoria
+      const docxMatch = fila.match(/href=["']([^"']*(?:resumen|convocatoria)[^"']*\.(?:docx|pdf))/i);
+      const urlDetalle = docxMatch ? 
+        (docxMatch[1].startsWith('http') ? docxMatch[1] : 'https://compranet.sinaloa.gob.mx' + docxMatch[1]) :
+        null;
+
+      console.log('  Sinaloa TI vigente: ' + titulo.substring(0, 60));
+
+      if (urlDetalle) {
+        // Leer el DOCX para extraer fechas
+        await new Promise(r => setTimeout(r, 2000));
+        const contenidoDoc = await fetchContenido(urlDetalle);
+        if (contenidoDoc && contenidoDoc.length > 100) {
+          const respFechas = await llamarIA(
+            PROMPT_DETALLE(urlDetalle, nombrePortal, contenidoDoc), 700
+          );
+          const jsonFechas = limpiarJSON(respFechas);
+          if (jsonFechas) {
+            const detalle = JSON.parse(jsonFechas);
+            const lics = detalle.licitaciones || [detalle];
+            for (const lic of lics) {
+              if (!lic.titulo || lic.score === 'No relevante') continue;
+              console.log('  Fechas Sinaloa - Fallo: ' + lic.fallo + ' | Entrega: ' + lic.fecha_entrega);
+              if (licitacionVencida(lic)) {
+                console.log('  Vencida Sinaloa: ' + (lic.titulo||'').substring(0,50));
+                continue;
+              }
+              lic.portal_url = urlDetalle;
+              lic.portal_nombre = nombrePortal;
+              lic.hash = crypto.createHash('md5').update(url + titulo).digest('hex');
+              resultados.push(lic);
+            }
+            continue;
+          }
+        }
+      }
+
+      // Sin DOCX — agregar con info básica
+      resultados.push({
+        titulo: titulo,
+        dependencia: nombrePortal,
+        tipo: 'No determinado',
+        score: 'Medio',
+        marcas: 'Ninguna',
+        junta_aclaraciones: 'No especificada',
+        fecha_entrega: 'No especificada',
+        fallo: 'No especificada',
+        justificacion: 'Licitacion TI vigente en Sinaloa (sin fallo publicado)',
+        portal_url: url,
+        portal_nombre: nombrePortal,
+        hash: crypto.createHash('md5').update(url + titulo).digest('hex'),
+      });
+    }
+
+    console.log('  ' + nombrePortal + ': ' + resultados.length + ' relevantes vigentes');
+  } catch(e) {
+    console.log('  Error Sinaloa: ' + e.message.substring(0, 80));
+  }
+
+  return resultados;
+}
+
 async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
   // Manejo especial para API de ComprasMX
   if (url.startsWith('COMPRASMX_API:')) {
@@ -377,6 +480,11 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
     if (!contenidoIndice) {
       console.log('  No se pudo acceder a ' + nombrePortal);
       return [];
+    }
+
+    // Procesamiento especial para portales tipo Sinaloa (tabla con documentos)
+    if (url.includes('compranet.sinaloa.gob.mx')) {
+      return await analizarSinaloa(url, nombrePortal, contenidoIndice);
     }
 
     const respuestaIndice = await llamarIA(
