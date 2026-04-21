@@ -352,9 +352,16 @@ async function analizarSinaloa(url, nombrePortal, htmlContenido) {
 
   // Extraer tabla de licitaciones del HTML
   // Buscar filas que contengan palabras clave de TI
-  const palabrasTI = ['telecomunicacion', 'internet', 'red ', 'redes', 'computo', 'tecnologia',
-    'firewall', 'switch', 'router', 'wifi', 'cctv', 'videovigilancia', 'fibra', 'noc',
-    'soporte tecnico', 'mantenimiento.*equipo', 'infraestructura'];
+  const palabrasTI = [
+      'telecomunicacion', 'internet dedicado', 'red de datos', 'redes de computo',
+      'infraestructura de red', 'computo y comunicaciones', 'tecnologias de informacion',
+      'firewall', 'switch ', 'router', 'wi-fi', 'wifi', 'cctv', 'videovigilancia',
+      'fibra optica', 'noc ', 'mesa de servicio', 'mesa de ayuda',
+      'soporte tecnico', 'mantenimiento de equipo de computo',
+      'mantenimiento de red', 'licenciamiento', 'licencias de software',
+      'sistema de videovigilancia', 'equipo de radiocomunicacion',
+      'enlaces de datos', 'servicio de conectividad', 'seguridad informatica'
+    ];
 
   // Extraer links de DOCX/PDF de convocatoria del HTML original
   // Necesitamos el HTML completo, no el texto
@@ -382,15 +389,32 @@ async function analizarSinaloa(url, nombrePortal, htmlContenido) {
         continue; // Ya adjudicada, saltar
       }
 
+      // Solo incluir 2026 y 2025 recientes
+      const tieneAñoViejo = /\/202[0-4]|-202[0-4]|_202[0-4]/.test(fila);
+      if (tieneAñoViejo) continue;
+
       // Extraer titulo
       const tituloMatch = fila.match(/<td[^>]*>([^<]{20,200})<\/td>/);
       const titulo = tituloMatch ? tituloMatch[1].trim() : 'Licitacion Sinaloa';
 
       // Buscar link a DOCX de resumen de convocatoria
-      const docxMatch = fila.match(/href=["']([^"']*(?:resumen|convocatoria)[^"']*\.(?:docx|pdf))/i);
-      const urlDetalle = docxMatch ? 
-        (docxMatch[1].startsWith('http') ? docxMatch[1] : 'https://compranet.sinaloa.gob.mx' + docxMatch[1]) :
-        null;
+      // El texto del link dice "RESUMEN DE CONVOCATORIA" pero la URL es /uploads/files/hash.docx
+      const resumenMatch = fila.match(/resumen[^<]*<\/a>/i);
+      let urlDetalle = null;
+      if (resumenMatch) {
+        const hrefMatch = fila.match(/href=["']([^"']*\.docx[^"']*)/i);
+        if (hrefMatch) {
+          urlDetalle = hrefMatch[1].startsWith('http') ? hrefMatch[1] : 'https://compranet.sinaloa.gob.mx' + hrefMatch[1];
+        }
+      }
+      // Si no hay resumen, buscar cualquier DOCX de convocatoria
+      if (!urlDetalle) {
+        const convMatch = fila.match(/convocatoria[^<]*href=["']([^"']*\.docx)/i) || 
+                          fila.match(/href=["']([^"']*\.docx)[^"']*"[^>]*>\s*(?:convocatoria|resumen)/i);
+        if (convMatch) {
+          urlDetalle = convMatch[1].startsWith('http') ? convMatch[1] : 'https://compranet.sinaloa.gob.mx' + convMatch[1];
+        }
+      }
 
       console.log('  Sinaloa TI vigente: ' + titulo.substring(0, 60));
 

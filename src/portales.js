@@ -43,7 +43,7 @@ const PORTALES = [
   { url: 'https://sitio.sanluis.gob.mx/SanLuisPotoSi/LicitacionesPublicas2', nombre: 'San Luis Potosí', categoria: 'Estado' },
   { url: 'https://sitio.sanluis.gob.mx/SanLuisPotoSi/Compras2', nombre: 'San Luis Potosí Compras', categoria: 'Estado' },
   { url: 'https://compranet.sinaloa.gob.mx/secretaria-de-administracion-y-finanzas-ges', nombre: 'Sinaloa Adm. General', categoria: 'Estado' },
-  { url: 'https://compranet.sinaloa.gob.mx/secretaria-de-obras-publicas', nombre: 'Sinaloa Obras Públicas', categoria: 'Estado' },
+  // { url: 'https://compranet.sinaloa.gob.mx/secretaria-de-obras-publicas', nombre: 'Sinaloa Obras Públicas', categoria: 'Estado' }, // construccion no TI
   { url: 'https://compranet.sinaloa.gob.mx/secretaria-de-administracion-y-finanzas-saf', nombre: 'Sinaloa SAF', categoria: 'Estado' },
   { url: 'https://compranet.sinaloa.gob.mx/secretaria-de-turismo', nombre: 'Sinaloa Turismo', categoria: 'Estado' },
   { url: 'https://compranet.sinaloa.gob.mx/sistema-estatal-de-seguridad-publica-sesesp', nombre: 'Sinaloa SESESP', categoria: 'Estado' },
