@@ -78,7 +78,7 @@ async function fetchContenido(url) {
         const pdfParse = require('pdf-parse');
         const data = await pdfParse(response.data);
         if (data.text && data.text.trim().length > 100) {
-          return data.text.substring(0, 12000);
+          return data.text.substring(0, 20000);
         }
         return null; // PDF escaneado sin texto
       } catch(e) { return null; }
@@ -90,7 +90,7 @@ async function fetchContenido(url) {
         const mammoth = require('mammoth');
         const result = await mammoth.extractRawText({ buffer: Buffer.from(response.data) });
         if (result.value && result.value.trim().length > 50) {
-          return result.value.substring(0, 12000);
+          return result.value.substring(0, 20000);
         }
       } catch(e) {}
       return null;
@@ -117,7 +117,7 @@ async function fetchContenido(url) {
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
-      .substring(0, 12000);
+      .substring(0, 20000);
 
     if (links.length > 0) {
       texto += '\n\nPDFs en esta pagina: ' + links.slice(0, 5).join(', ');
@@ -194,8 +194,8 @@ async function llamarIA(prompt, maxTokens = 1000) {
 
 const PROMPT_INDICE = (url, nombre, contenido, criteriosExtra) => `Eres un analizador de licitaciones publicas para GTG, empresa de redes TI en Mexico.
 
-GTG busca: switches, routers, firewalls, WiFi, CCTV, videovigilancia, cableado estructurado, fibra optica, NOC, call center, mesa de ayuda, soporte tecnico, servicio administrado, mantenimiento de red, telecomunicaciones, infraestructura TI.
-Marcas prioritarias: Huawei, Ruckus, H3C, Ivanti, Proactivanet. Marcas secundarias (score Revisar): Cisco, Fortinet.
+GTG busca: switches, routers, firewalls, WiFi, CCTV, videovigilancia, cableado estructurado, fibra optica, NOC, call center, mesa de ayuda, soporte tecnico, servicio administrado, mantenimiento de red, telecomunicaciones, infraestructura TI, computo, redes, internet, enlaces, videoconferencia, seguridad informatica, licencias software, servidores, centros de datos.
+Marcas prioritarias: Huawei, Ruckus, H3C, Ivanti, Proactivanet. Marcas secundarias (score Revisar): Cisco, Fortinet, HP, Dell, Lenovo.
 ${criteriosExtra ? 'APRENDIZAJE - palabras con mayor relevancia: ' + criteriosExtra : ''}
 
 REGLAS:
