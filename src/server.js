@@ -288,6 +288,12 @@ function guardar(id) {
 </html>`);
 });
 
+app.get('/reset-portales', (req, res) => {
+  // Eliminar todos los portales de la BD para que se recarguen del codigo
+  db.exec('DELETE FROM portales');
+  res.send('Portales eliminados de la BD. Reinicia el servidor para recargarlos. <a href="/">Dashboard</a>');
+});
+
 app.get('/limpiar', (req, res) => {
   // Eliminar duplicados
   db.exec(`DELETE FROM licitaciones WHERE id NOT IN (
