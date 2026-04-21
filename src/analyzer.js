@@ -237,11 +237,14 @@ Si no hay relevantes: {"total_relevantes": 0, "licitaciones": []}`;
 const PROMPT_DETALLE = (url, nombre, contenido) => `Analiza este contenido de licitacion publica para GTG (empresa de redes TI en Mexico).
 Fecha de hoy: ${HOY.toLocaleDateString('es-MX')}.
 
-Extrae las fechas buscando estos patrones:
+Extrae las fechas buscando CUALQUIERA de estos patrones:
 - "Junta de aclaraciones" o "Aclaracion de bases" -> junta_aclaraciones
 - "Acto de presentacion", "Apertura de proposiciones", "Entrega de propuestas" -> fecha_entrega
-- "Acto de fallo", "Fallo" -> fallo
-- Fechas en formato "DD de mes de YYYY" o "DD/MM/YYYY"
+- "Acto de fallo", "Fallo", "Comunicacion de fallo" -> fallo
+- "Vigencia: DD al DD de mes de YYYY" -> usa la fecha final como fecha_entrega
+- "Fecha limite", "Fecha de cierre", "Fecha de recepcion" -> fecha_entrega
+- Fechas en formato "DD de mes de YYYY", "DD/MM/YYYY", o "YYYY-MM-DD"
+Si encuentras "Vigencia: X al Y", usa Y como fecha_entrega.
 
 Portal: ${nombre}
 URL: ${url}
