@@ -506,7 +506,7 @@ async function analizarCIBNOR(url, nombrePortal) {
     console.log('  CIBNOR PDFs 2026 encontrados: ' + links2026.length);
 
     for (const pdfUrl of links2026) {
-      await new Promise(r => setTimeout(r, 5000));
+      await new Promise(r => setTimeout(r, 8000));
       try {
         const contenidoPDF = await fetchContenido(pdfUrl);
         if (!contenidoPDF || contenidoPDF.length < 100) continue;
