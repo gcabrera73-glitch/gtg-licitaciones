@@ -662,15 +662,15 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
           for (const lic of lics) {
             if (!lic.titulo || lic.score === 'No relevante') continue;
             console.log('  Fechas fetch - Fallo: ' + lic.fallo + ' | Entrega: ' + lic.fecha_entrega);
-            if (licitacionVencida(lic)) {
-              console.log('  Vencida: ' + (lic.titulo || '').substring(0, 50));
-              continue;
-            }
             lic.portal_url = urlDetalle;
             lic.portal_nombre = nombrePortal;
             lic.hash = crypto.createHash('md5')
               .update(urlDetalle + (lic.titulo || '') + (lic.numero_licitacion || ''))
               .digest('hex');
+            if (licitacionVencida(lic)) {
+              console.log('  Vencida: ' + (lic.titulo || '').substring(0, 50));
+              lic.score = 'Vencida'; // Guardar con fechas pero score Vencida
+            }
             resultados.push(lic);
           }
           continue;

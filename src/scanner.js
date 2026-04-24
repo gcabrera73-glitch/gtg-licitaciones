@@ -57,6 +57,7 @@ async function ejecutarScan(onProgreso) {
     for (const resultado of resultados) {
       encontradas++;
       const esRelevante = ['Alto', 'Medio'].includes(resultado.score);
+      if (resultado.score === 'Vencida') resultado.score = 'No relevante';
       const esRevisar = resultado.score === 'Revisar';
 
       try {
