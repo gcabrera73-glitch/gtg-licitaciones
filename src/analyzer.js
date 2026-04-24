@@ -502,11 +502,11 @@ async function analizarCIBNOR(url, nombrePortal) {
     }
 
     // Solo PDFs de 2026
-    const links2026 = links.filter(l => l.includes('2026') || l.includes('-26'));
+    const links2026 = links.filter(l => l.includes('2026') || l.includes('-26_') || l.includes('-26.') || l.includes('_26_') || /-N-\d{2}-26/i.test(l));
     console.log('  CIBNOR PDFs 2026 encontrados: ' + links2026.length);
 
     for (const pdfUrl of links2026) {
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, 5000));
       try {
         const contenidoPDF = await fetchContenido(pdfUrl);
         if (!contenidoPDF || contenidoPDF.length < 100) continue;
@@ -619,7 +619,7 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
     );
 
     for (const urlDetalle of urlsUnicas) {
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, 5000));
       try {
         let resultado = null;
 
