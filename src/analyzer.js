@@ -567,7 +567,8 @@ async function analizarPuebla(url, nombrePortal) {
 
     // Filtrar PDFs con palabras TI en el nombre del archivo
     const palabrasTI = /tecnolog|computo|telecomunicac|internet|red_|redes|firewall|switch|router|wifi|cctv|videovigilancia|fibra|noc|soporte|mantenimiento.*equip|infraestructura|licencias|software|servidor|seguridad.*informatica|satelital/i;
-    const pdfsTI = todosLinks.filter(l => palabrasTI.test(l));
+    // Solo procesar PDFs de 2026 para evitar historial
+    const pdfsTI = todosLinks.filter(l => palabrasTI.test(l) && l.includes('2026'));
 
     console.log('  Puebla PDFs TI encontrados: ' + pdfsTI.length + ' de ' + todosLinks.length + ' totales');
 
@@ -675,7 +676,8 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
     const licitaciones = (indice.licitaciones || []).filter(lic => {
       const texto = (lic.titulo || '') + (lic.resumen || '');
       // Buscar años explícitos en el texto
-      const añoMatch = texto.match(/\/?(20\d{2})[^\d]/);
+      // Solo detectar año en contexto de número de licitación (precedido de / - _)
+      const añoMatch = texto.match(/[\/\-_](20\d{2})[^\d]/);
       if (añoMatch) {
         const año = parseInt(añoMatch[1]);
         if (año < AÑO_MIN) {
