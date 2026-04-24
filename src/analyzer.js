@@ -599,7 +599,21 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
     }
 
     const indice = JSON.parse(jsonIndice);
-    const licitaciones = indice.licitaciones || [];
+    // Filtrar licitaciones con años anteriores a 2025 en el título o número
+    const AÑO_MIN = 2025;
+    const licitaciones = (indice.licitaciones || []).filter(lic => {
+      const texto = (lic.titulo || '') + (lic.resumen || '');
+      // Buscar años explícitos en el texto
+      const añoMatch = texto.match(/\/?(20\d{2})[^\d]/);
+      if (añoMatch) {
+        const año = parseInt(añoMatch[1]);
+        if (año < AÑO_MIN) {
+          console.log('  Descartada por año ' + año + ': ' + texto.substring(0, 50));
+          return false;
+        }
+      }
+      return true;
+    });
 
     if (licitaciones.length === 0) {
       console.log('  Sin relevantes en ' + nombrePortal);
