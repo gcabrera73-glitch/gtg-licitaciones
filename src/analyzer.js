@@ -120,7 +120,10 @@ async function fetchContenido(url) {
       .substring(0, 40000);
 
     if (links.length > 0) {
-      texto += '\n\nPDFs en esta pagina: ' + links.slice(0, 5).join(', ');
+      // Para CIBNOR, incluir todos los PDFs de convocatorias TI
+      const pdfsTI = links.filter(l => /firewall|nac|red|lan|wlan|centro.*datos|internet|telefonia|videoconfer|computo|cctv|seguridad/i.test(l));
+      const pdfsTexto = pdfsTI.length > 0 ? pdfsTI : links.slice(0, 8);
+      texto += '\n\nPDFs de convocatorias en esta pagina:\n' + pdfsTexto.join('\n');
     }
     return texto;
   } catch (e) {
@@ -475,6 +478,71 @@ async function analizarSinaloa(url, nombrePortal, htmlContenido) {
   return resultados;
 }
 
+
+async function analizarCIBNOR(url, nombrePortal) {
+  const resultados = [];
+  try {
+    // Obtener el HTML completo sin límite de caracteres
+    const response = await axios.get(url, {
+      timeout: 25000, headers: HEADERS, maxRedirects: 5,
+      responseType: 'arraybuffer'
+    });
+    const html = Buffer.from(response.data).toString('utf-8');
+
+    // Extraer todos los links a PDFs de convocatorias
+    const linkRegex = /href=["']([^"']*\/files\/admon\/convocatorias\/[^"']*\.pdf[^"']*)/gi;
+    const links = [];
+    let m;
+    while ((m = linkRegex.exec(html)) !== null) {
+      let pdfUrl = m[1];
+      if (!pdfUrl.startsWith('http')) {
+        pdfUrl = 'https://cibnor.mx' + pdfUrl;
+      }
+      links.push(pdfUrl);
+    }
+
+    // Solo PDFs de 2026
+    const links2026 = links.filter(l => l.includes('2026') || l.includes('-26'));
+    console.log('  CIBNOR PDFs 2026 encontrados: ' + links2026.length);
+
+    for (const pdfUrl of links2026) {
+      await new Promise(r => setTimeout(r, 3000));
+      try {
+        const contenidoPDF = await fetchContenido(pdfUrl);
+        if (!contenidoPDF || contenidoPDF.length < 100) continue;
+
+        const respFechas = await llamarIA(
+          PROMPT_DETALLE(pdfUrl, nombrePortal, contenidoPDF), 700
+        );
+        const jsonFechas = limpiarJSON(respFechas);
+        if (!jsonFechas) continue;
+
+        const detalle = JSON.parse(jsonFechas);
+        const lics = detalle.licitaciones || [detalle];
+
+        for (const lic of lics) {
+          if (!lic.titulo || lic.score === 'No relevante') continue;
+          console.log('  CIBNOR Fechas - Fallo: ' + lic.fallo + ' | Entrega: ' + lic.fecha_entrega);
+          if (licitacionVencida(lic)) {
+            console.log('  Vencida CIBNOR: ' + (lic.titulo||'').substring(0, 50));
+            continue;
+          }
+          lic.portal_url = pdfUrl;
+          lic.portal_nombre = nombrePortal;
+          lic.hash = crypto.createHash('md5').update(pdfUrl + (lic.titulo||'')).digest('hex');
+          resultados.push(lic);
+        }
+      } catch(e) {
+        console.log('  Error CIBNOR PDF: ' + e.message.substring(0, 60));
+      }
+    }
+    console.log('  ' + nombrePortal + ': ' + resultados.length + ' relevantes vigentes');
+  } catch(e) {
+    console.log('  Error CIBNOR: ' + e.message.substring(0, 80));
+  }
+  return resultados;
+}
+
 async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
   // Manejo especial para API de ComprasMX
   if (url.startsWith('COMPRASMX_API:')) {
@@ -512,6 +580,11 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
     // Procesamiento especial para portales tipo Sinaloa (tabla con documentos)
     if (url.includes('compranet.sinaloa.gob.mx')) {
       return await analizarSinaloa(url, nombrePortal, contenidoIndice);
+    }
+
+    // Procesamiento especial para CIBNOR - extraer PDFs directamente del HTML
+    if (url.includes('cibnor.mx')) {
+      return await analizarCIBNOR(url, nombrePortal);
     }
 
     const respuestaIndice = await llamarIA(

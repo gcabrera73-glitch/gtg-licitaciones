@@ -11,7 +11,7 @@ const PORTALES = [
   // SECTOR SALUD
   // { url: 'http://hjm.salud.gob.mx/interna/licitaciones/licitaciones.html', nombre: 'Hospital Juárez de México', categoria: 'Salud' }, // portal abandonado
   { url: 'https://www.pediatria.gob.mx/interna/licita.html', nombre: 'Hospital Infantil de México', categoria: 'Salud' },
-  { url: 'https://cibnor.mx/proyectos-y-convocatorias-licitacion-laassp-lopsrm', nombre: 'CIBNOR', categoria: 'Salud' },
+  { url: 'https://cibnor.mx/proyectos-y-convocatorias-licitacion-laassp-lopsrm?view=article&id=933:conlicita-adquisiciones-arrendamientos-y-servicios&catid=131', nombre: 'CIBNOR Baja California Sur', categoria: 'Federal' },
 
   // ESTADOS
   { url: 'https://egobierno2.aguascalientes.gob.mx/servicios/LicitacionesEstatales/ui/dependencia.aspx?i=64', nombre: 'Aguascalientes', categoria: 'Estado' },
