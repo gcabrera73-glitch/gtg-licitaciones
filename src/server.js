@@ -295,18 +295,27 @@ app.get('/reset-portales', (req, res) => {
 });
 
 app.get('/limpiar', (req, res) => {
+  // Eliminar todo excepto las del ultimo scan (ultimas 2 horas)
+  db.exec("DELETE FROM licitaciones WHERE fecha_deteccion < datetime('now', '-2 hours', 'localtime')");
+  // Eliminar scores Error y No relevante
+  db.exec("DELETE FROM licitaciones WHERE score='Error' OR score='No relevante'");
   // Eliminar duplicados
   db.exec(`DELETE FROM licitaciones WHERE id NOT IN (
     SELECT MAX(id) FROM licitaciones GROUP BY titulo, portal_nombre
   )`);
-  // Eliminar scores Error y No relevante
-  db.exec("DELETE FROM licitaciones WHERE score='Error' OR score='No relevante'");
-  // Eliminar licitaciones de mas de 30 dias
-  db.exec("DELETE FROM licitaciones WHERE fecha_deteccion < datetime('now', '-30 days', 'localtime')");
-  // Eliminar licitaciones de 2024 o anterior por titulo
-  db.exec("DELETE FROM licitaciones WHERE titulo LIKE '%/2024%' OR titulo LIKE '%-2024%' OR titulo LIKE '%/2023%' OR titulo LIKE '%/2022%'");
   const total = db.prepare('SELECT COUNT(*) as n FROM licitaciones').get().n;
   res.send('Limpieza completada. Licitaciones restantes: ' + total + '. <a href="/">Ver dashboard</a>');
+});
+
+app.get('/limpiar-todo', (req, res) => {
+  // Limpieza total - solo ultimas 24 horas
+  db.exec("DELETE FROM licitaciones WHERE fecha_deteccion < datetime('now', '-24 hours', 'localtime')");
+  db.exec("DELETE FROM licitaciones WHERE score='Error' OR score='No relevante'");
+  db.exec(`DELETE FROM licitaciones WHERE id NOT IN (
+    SELECT MAX(id) FROM licitaciones GROUP BY titulo, portal_nombre
+  )`);
+  const total = db.prepare('SELECT COUNT(*) as n FROM licitaciones').get().n;
+  res.send('Limpieza total completada. Licitaciones restantes: ' + total + '. <a href="/">Ver dashboard</a>');
 });
 
 const PORT = process.env.PORT || 3000;
