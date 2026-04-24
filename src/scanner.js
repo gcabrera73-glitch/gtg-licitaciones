@@ -71,16 +71,12 @@ async function ejecutarScan(onProgreso) {
              @junta_aclaraciones, @fecha_entrega, @fallo, @justificacion, @hash)
           `).run(resultado);
         } else {
-          // Actualizar fechas si el nuevo scan las tiene y antes no
+          // Siempre actualizar fechas si el nuevo scan las tiene
           const tieneFechasNuevas = 
             (resultado.junta_aclaraciones && resultado.junta_aclaraciones !== 'No especificada') ||
             (resultado.fecha_entrega && resultado.fecha_entrega !== 'No especificada') ||
             (resultado.fallo && resultado.fallo !== 'No especificada');
-          const noTeniaFechas = 
-            (!existe.junta_aclaraciones || existe.junta_aclaraciones === 'No especificada') &&
-            (!existe.fecha_entrega || existe.fecha_entrega === 'No especificada') &&
-            (!existe.fallo || existe.fallo === 'No especificada');
-          if (tieneFechasNuevas && noTeniaFechas) {
+          if (tieneFechasNuevas) {
             db.prepare(`UPDATE licitaciones SET 
               junta_aclaraciones=?, fecha_entrega=?, fallo=?, score=?
               WHERE hash=?`).run(
