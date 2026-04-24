@@ -543,6 +543,72 @@ async function analizarCIBNOR(url, nombrePortal) {
   return resultados;
 }
 
+
+async function analizarPuebla(url, nombrePortal) {
+  const resultados = [];
+  try {
+    const response = await axios.get(url, {
+      timeout: 25000, headers: HEADERS, maxRedirects: 5,
+      responseType: 'arraybuffer'
+    });
+    const html = Buffer.from(response.data).toString('utf-8');
+
+    // Extraer todos los links a PDFs de la página completa
+    const linkRegex = /href=["']([^"']*\/images\/[^"']*\.pdf[^"']*)/gi;
+    const todosLinks = [];
+    let m;
+    while ((m = linkRegex.exec(html)) !== null) {
+      let pdfUrl = m[1];
+      if (!pdfUrl.startsWith('http')) {
+        pdfUrl = 'https://licitaciones.puebla.gob.mx' + pdfUrl;
+      }
+      todosLinks.push(pdfUrl);
+    }
+
+    // Filtrar PDFs con palabras TI en el nombre del archivo
+    const palabrasTI = /tecnolog|computo|telecomunicac|internet|red_|redes|firewall|switch|router|wifi|cctv|videovigilancia|fibra|noc|soporte|mantenimiento.*equip|infraestructura|licencias|software|servidor|seguridad.*informatica|satelital/i;
+    const pdfsTI = todosLinks.filter(l => palabrasTI.test(l));
+
+    console.log('  Puebla PDFs TI encontrados: ' + pdfsTI.length + ' de ' + todosLinks.length + ' totales');
+
+    for (const pdfUrl of pdfsTI) {
+      await new Promise(r => setTimeout(r, 8000));
+      try {
+        const contenidoPDF = await fetchContenido(pdfUrl);
+        if (!contenidoPDF || contenidoPDF.length < 100) continue;
+
+        const respFechas = await llamarIA(
+          PROMPT_DETALLE(pdfUrl, nombrePortal, contenidoPDF), 700
+        );
+        const jsonFechas = limpiarJSON(respFechas);
+        if (!jsonFechas) continue;
+
+        const detalle = JSON.parse(jsonFechas);
+        const lics = detalle.licitaciones || [detalle];
+
+        for (const lic of lics) {
+          if (!lic.titulo || lic.score === 'No relevante') continue;
+          console.log('  Puebla Fechas - Fallo: ' + lic.fallo + ' | Entrega: ' + lic.fecha_entrega);
+          lic.portal_url = pdfUrl;
+          lic.portal_nombre = nombrePortal;
+          lic.hash = crypto.createHash('md5').update(pdfUrl + (lic.titulo || '')).digest('hex');
+          if (licitacionVencida(lic)) {
+            console.log('  Vencida Puebla: ' + (lic.titulo || '').substring(0, 50));
+            lic.score = 'Vencida';
+          }
+          resultados.push(lic);
+        }
+      } catch(e) {
+        console.log('  Error Puebla PDF: ' + e.message.substring(0, 60));
+      }
+    }
+    console.log('  ' + nombrePortal + ': ' + resultados.filter(r => r.score !== 'Vencida').length + ' relevantes vigentes de ' + resultados.length);
+  } catch(e) {
+    console.log('  Error Puebla: ' + e.message.substring(0, 80));
+  }
+  return resultados.filter(r => r.score !== 'Vencida');
+}
+
 async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
   // Manejo especial para API de ComprasMX
   if (url.startsWith('COMPRASMX_API:')) {
@@ -585,6 +651,11 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
     // Procesamiento especial para CIBNOR - extraer PDFs directamente del HTML
     if (url.includes('cibnor.mx')) {
       return await analizarCIBNOR(url, nombrePortal);
+    }
+
+    // Procesamiento especial para Puebla - extraer PDFs de TI directamente
+    if (url.includes('licitaciones.puebla.gob.mx')) {
+      return await analizarPuebla(url, nombrePortal);
     }
 
     const respuestaIndice = await llamarIA(
