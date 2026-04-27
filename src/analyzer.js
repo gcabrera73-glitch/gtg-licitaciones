@@ -486,6 +486,72 @@ async function analizarCDMX(url, nombrePortal) {
   return resultados;
 }
 
+
+async function analizarDurango(url, nombrePortal) {
+  const resultados = [];
+  try {
+    // Leer índice de procedimientos
+    const response = await axios.get(url, { timeout: 25000, headers: HEADERS, maxRedirects: 5, responseType: 'arraybuffer' });
+    const html = Buffer.from(response.data).toString('utf-8');
+
+    // Extraer IDs de licitaciones del índice — patrón /ProcedimientosDeContratacion/NNNN
+    const idRegex = /ProcedimientosDeContratacion\/(d+)/g;
+    const ids = [];
+    let m;
+    while ((m = idRegex.exec(html)) !== null) {
+      if (!ids.includes(m[1])) ids.push(m[1]);
+    }
+
+    const palabrasTI = /tecnolog|computo|telecomunicac|internet|red |redes|firewall|switch|router|wifi|cctv|videovigilancia|fibra|noc|soporte.tecnico|infraestructura.*red|licencias|software|servidor|seguridad.informatica|satelital|c5|comunicaciones|conectividad/i;
+
+    console.log('  Durango procedimientos encontrados: ' + ids.length);
+
+    for (const id of ids) {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const detUrl = 'https://comprasestatal.durango.gob.mx/consulta/ProcedimientosDeContratacion/' + id;
+        const detResp = await axios.get(detUrl, { timeout: 20000, headers: HEADERS, responseType: 'arraybuffer' });
+        const detHtml = Buffer.from(detResp.data).toString('utf-8');
+
+        // Extraer descripción
+        const descMatch = detHtml.match(/Descripci[oó]n:[sS]*?</dt>[sS]*?<dd[^>]*>s*([^<]{10,300})s*</dd>/i);
+        const titulo = descMatch ? descMatch[1].trim() : '';
+        if (!titulo || !palabrasTI.test(titulo)) continue;
+
+        // Extraer fechas directamente del HTML
+        const juntaMatch = detHtml.match(/Junta de[sS]*?Aclaraciones:[sS]*?<dd[^>]*>s*(d{4}-d{2}-d{2}s+d{2}:d{2})/i);
+        const aperturaMatch = detHtml.match(/Apertura de[sS]*?Proposiciones:[sS]*?<dd[^>]*>s*(d{4}-d{2}-d{2}s+d{2}:d{2})/i);
+        const falloMatch = detHtml.match(/Evento de[sS]*?Fallo:[sS]*?<dd[^>]*>s*(d{4}-d{2}-d{2}s+d{2}:d{2})/i);
+        const depMatch = detHtml.match(/Unidad Compradora:[sS]*?</dt>[sS]*?<dd[^>]*>[sS]*?-s*([^<]{5,100})</dd>/i);
+
+        const junta = juntaMatch ? juntaMatch[1] : 'No especificada';
+        const apertura = aperturaMatch ? aperturaMatch[1] : 'No especificada';
+        const fallo = falloMatch ? falloMatch[1] : 'No especificada';
+        const dependencia = depMatch ? depMatch[1].trim() : nombrePortal;
+
+        // Verificar si está vencida
+        const fechaRef = parsearFecha(fallo) || parsearFecha(apertura);
+        if (fechaRef && fechaRef < HOY) {
+          console.log('  Vencida Durango: ' + titulo.substring(0, 60));
+          continue;
+        }
+
+        console.log('  Durango TI vigente: ' + titulo.substring(0, 60));
+        console.log('  Fechas Durango - Fallo: ' + fallo + ' | Apertura: ' + apertura);
+
+        resultados.push({
+          titulo, dependencia, tipo: 'No determinado', score: 'Medio', marcas: 'Ninguna',
+          junta_aclaraciones: junta, fecha_entrega: apertura, fallo,
+          justificacion: 'Licitacion TI vigente en Durango',
+          numero_licitacion: 'No especificado', portal_url: detUrl, portal_nombre: nombrePortal,
+          hash: crypto.createHash('md5').update(detUrl + titulo).digest('hex')
+        });
+      } catch(e) {}
+    }
+    console.log('  ' + nombrePortal + ': ' + resultados.length + ' relevantes vigentes');
+  } catch(e) { console.log('  Error Durango: ' + e.message.substring(0, 80)); }
+  return resultados;
+}
 async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
   if (url.startsWith('COMPRASMX_API:')) {
     const keywords = url.replace('COMPRASMX_API:', '');
@@ -514,6 +580,7 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
     if (url.includes('cibnor.mx')) return await analizarCIBNOR(url, nombrePortal);
     if (url.includes('licitaciones.puebla.gob.mx')) return await analizarPuebla(url, nombrePortal);
     if (url.includes('concursodigital.finanzas.cdmx.gob.mx')) return await analizarCDMX(url, nombrePortal);
+    if (url.includes('comprasestatal.durango.gob.mx')) return await analizarDurango(url, nombrePortal);
 
     const respuestaIndice = await llamarIA(PROMPT_INDICE(url, nombrePortal, contenidoIndice, criteriosAprendizaje), 1500);
     const jsonIndice = limpiarJSON(respuestaIndice);
