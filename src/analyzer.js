@@ -155,7 +155,6 @@ Responde SOLO con JSON:
         timeout: 45000
       }
     );
-
     let texto = '';
     for (const block of response.data.content || []) {
       if (block.type === 'text') texto += block.text;
@@ -292,10 +291,9 @@ async function consultarComprasMX(keywords) {
     for (const exp of lista) {
       const titulo = exp.nombre_procedimiento || exp.titulo || '';
       const numero = exp.numero_procedimiento || exp.codigo_procedimiento || '';
-      const dependencia = exp.nombre_dependencia || exp.institucion || '';
       const urlDetalle = exp.id_expediente ? 'https://upcp-compranet.buengobierno.gob.mx/sitiopublico/#/sitiopublico/detalle/' + exp.id_expediente + '/procedimiento' : 'https://upcp-compranet.buengobierno.gob.mx/sitiopublico/';
       resultados.push({
-        titulo, dependencia, tipo: 'No determinado', score: 'Revisar', marcas: 'Ninguna',
+        titulo, dependencia: exp.nombre_dependencia || '', tipo: 'No determinado', score: 'Revisar', marcas: 'Ninguna',
         junta_aclaraciones: exp.fecha_junta_aclaraciones || 'No especificada',
         fecha_entrega: exp.fecha_apertura_proposiciones || 'No especificada',
         fallo: exp.fecha_fallo || 'No especificada',
@@ -305,9 +303,7 @@ async function consultarComprasMX(keywords) {
       });
     }
     console.log('  ComprasMX [' + keywords + ']: ' + resultados.length + ' resultados');
-  } catch(e) {
-    console.log('  Error ComprasMX: ' + e.message.substring(0, 80));
-  }
+  } catch(e) { console.log('  Error ComprasMX: ' + e.message.substring(0, 80)); }
   return resultados;
 }
 
@@ -358,7 +354,6 @@ async function analizarSinaloa(url, nombrePortal, htmlContenido) {
             const lics = detalle.licitaciones || [detalle];
             for (const lic of lics) {
               if (!lic.titulo || lic.score === 'No relevante') continue;
-              console.log('  Fechas Sinaloa - Fallo: ' + lic.fallo + ' | Entrega: ' + lic.fecha_entrega);
               if (licitacionVencida(lic)) { console.log('  Vencida Sinaloa: ' + (lic.titulo||'').substring(0,50)); continue; }
               lic.portal_url = urlDetalle; lic.portal_nombre = nombrePortal;
               lic.hash = crypto.createHash('md5').update(url + titulo).digest('hex');
@@ -428,7 +423,6 @@ async function analizarPuebla(url, nombrePortal) {
       if (!pdfUrl.startsWith('http')) pdfUrl = 'https://licitaciones.puebla.gob.mx' + pdfUrl;
       todosLinks.push(pdfUrl);
     }
-    // Filtro mejorado: incluye equipos_menores, tic, y excluye palabras ambiguas
     const palabrasTI = /tecnolog|tic_|_tic|computo|telecomunicac|internet|red_lan|redes|firewall|switch|router|wifi|cctv|videovigilancia|fibra|soporte_tecnico|soporte_empresarial|infraestructura.*red|licencias|software|servidor|seguridad.*informatica|satelital|equipos_menores/i;
     const pdfsTI = todosLinks.filter(l => palabrasTI.test(l) && l.includes('2026'));
     console.log('  Puebla PDFs TI encontrados: ' + pdfsTI.length + ' de ' + todosLinks.length + ' totales');
@@ -455,6 +449,41 @@ async function analizarPuebla(url, nombrePortal) {
     console.log('  ' + nombrePortal + ': ' + resultados.filter(r => r.score !== 'Vencida').length + ' relevantes vigentes de ' + resultados.length);
   } catch(e) { console.log('  Error Puebla: ' + e.message.substring(0, 80)); }
   return resultados.filter(r => r.score !== 'Vencida');
+}
+
+async function analizarCDMX(url, nombrePortal) {
+  const resultados = [];
+  try {
+    const response = await axios.get(url, { timeout: 25000, headers: HEADERS, maxRedirects: 5, responseType: 'arraybuffer' });
+    const html = Buffer.from(response.data).toString('utf-8');
+    const bloques = html.split('<h5>').slice(1);
+    const palabrasTI = /tecnolog|computo|telecomunicac|internet|red |redes|firewall|switch|router|wifi|cctv|videovigilancia|fibra|noc|soporte.tecnico|infraestructura.*red|licencias|software|servidor|seguridad.informatica|satelital|c5|comando.*control|comunicaciones.*ciudadano/i;
+    for (const bloque of bloques) {
+      const tituloMatch = bloque.match(/^([^<]+)/);
+      if (!tituloMatch) continue;
+      const titulo = tituloMatch[1].trim();
+      if (!palabrasTI.test(titulo)) continue;
+      const fechaMatch = bloque.match(/Presentaci[oó]n de propuestas[\s\S]*?(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/i);
+      const fechaPropuesta = fechaMatch ? fechaMatch[1] : 'No especificada';
+      const convMatch = bloque.match(/Entidad convocante[\s\S]*?<[^>]+>\s*([^<]{5,100})\s*</i);
+      const convocante = convMatch ? convMatch[1].trim() : nombrePortal;
+      const urlMatch = bloque.match(/href=["']([^"']*detalle_convocatoria[^"']*)/i);
+      const urlDetalle = urlMatch ? 'https://concursodigital.finanzas.cdmx.gob.mx' + urlMatch[1] : url;
+      const fechaObj = fechaPropuesta !== 'No especificada' ? new Date(fechaPropuesta) : null;
+      if (fechaObj && fechaObj < HOY) { console.log('  Vencida CDMX: ' + titulo.substring(0, 60)); continue; }
+      console.log('  CDMX TI vigente: ' + titulo.substring(0, 60));
+      console.log('  Fechas CDMX - Propuestas: ' + fechaPropuesta);
+      resultados.push({
+        titulo, dependencia: convocante, tipo: 'No determinado', score: 'Medio', marcas: 'Ninguna',
+        junta_aclaraciones: 'No especificada', fecha_entrega: fechaPropuesta, fallo: 'No especificada',
+        justificacion: 'Licitacion TI vigente en Concurso Digital CDMX',
+        numero_licitacion: 'No especificado', portal_url: urlDetalle, portal_nombre: nombrePortal,
+        hash: crypto.createHash('md5').update(urlDetalle + titulo).digest('hex')
+      });
+    }
+    console.log('  ' + nombrePortal + ': ' + resultados.length + ' relevantes vigentes');
+  } catch(e) { console.log('  Error CDMX: ' + e.message.substring(0, 80)); }
+  return resultados;
 }
 
 async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
@@ -484,6 +513,7 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
     if (url.includes('compranet.sinaloa.gob.mx')) return await analizarSinaloa(url, nombrePortal, contenidoIndice);
     if (url.includes('cibnor.mx')) return await analizarCIBNOR(url, nombrePortal);
     if (url.includes('licitaciones.puebla.gob.mx')) return await analizarPuebla(url, nombrePortal);
+    if (url.includes('concursodigital.finanzas.cdmx.gob.mx')) return await analizarCDMX(url, nombrePortal);
 
     const respuestaIndice = await llamarIA(PROMPT_INDICE(url, nombrePortal, contenidoIndice, criteriosAprendizaje), 1500);
     const jsonIndice = limpiarJSON(respuestaIndice);
