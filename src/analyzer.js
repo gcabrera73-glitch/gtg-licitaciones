@@ -552,6 +552,53 @@ async function analizarDurango(url, nombrePortal) {
   } catch(e) { console.log('  Error Durango: ' + e.message.substring(0, 80)); }
   return resultados;
 }
+
+async function analizarGuadalajara(url, nombrePortal) {
+  const resultados = [];
+  try {
+    const response = await axios.get(url, { timeout: 25000, headers: HEADERS, maxRedirects: 5, responseType: 'arraybuffer' });
+    const html = Buffer.from(response.data).toString('utf-8');
+
+    // Extraer todos los links a PDFs de convocatoria
+    const linkRegex = /href=["']([^"']*\/sites\/default\/files\/uploads\/[^"']*\.pdf[^"']*)/gi;
+    const todosLinks = [];
+    let m;
+    while ((m = linkRegex.exec(html)) !== null) {
+      let pdfUrl = m[1];
+      if (!pdfUrl.startsWith('http')) pdfUrl = 'https://transparencia.guadalajara.gob.mx' + pdfUrl;
+      if (!todosLinks.includes(pdfUrl)) todosLinks.push(pdfUrl);
+    }
+
+    // Filtrar PDFs de convocatoria con palabras TI en el nombre
+    const palabrasTI = /tecnolog|tic|computo|telecomunicac|internet|red_|redes|firewall|switch|router|wifi|cctv|videovigilancia|fibra|noc|soporte|software|servidor|seguridad|satelital|c5|conectividad|repetidores|plataforma|audiovisual|monitoreo/i;
+    const pdfsTI = todosLinks.filter(l => palabrasTI.test(l) && /CONVOC/i.test(l));
+
+    console.log('  Guadalajara PDFs TI encontrados: ' + pdfsTI.length + ' de ' + todosLinks.length + ' totales');
+
+    for (const pdfUrl of pdfsTI) {
+      await new Promise(r => setTimeout(r, 8000));
+      try {
+        const contenidoPDF = await fetchContenido(pdfUrl);
+        if (!contenidoPDF || contenidoPDF.length < 100) continue;
+        const respFechas = await llamarIA(PROMPT_DETALLE(pdfUrl, nombrePortal, contenidoPDF), 700);
+        const jsonFechas = limpiarJSON(respFechas);
+        if (!jsonFechas) continue;
+        const detalle = JSON.parse(jsonFechas);
+        const lics = detalle.licitaciones || [detalle];
+        for (const lic of lics) {
+          if (!lic.titulo || lic.score === 'No relevante') continue;
+          console.log('  Guadalajara Fechas - Fallo: ' + lic.fallo + ' | Entrega: ' + lic.fecha_entrega);
+          lic.portal_url = pdfUrl; lic.portal_nombre = nombrePortal;
+          lic.hash = crypto.createHash('md5').update(pdfUrl + (lic.titulo || '')).digest('hex');
+          if (licitacionVencida(lic)) { console.log('  Vencida Guadalajara: ' + (lic.titulo || '').substring(0, 50)); lic.score = 'Vencida'; }
+          resultados.push(lic);
+        }
+      } catch(e) { console.log('  Error Guadalajara PDF: ' + e.message.substring(0, 60)); }
+    }
+    console.log('  ' + nombrePortal + ': ' + resultados.filter(r => r.score !== 'Vencida').length + ' relevantes vigentes de ' + resultados.length);
+  } catch(e) { console.log('  Error Guadalajara: ' + e.message.substring(0, 80)); }
+  return resultados.filter(r => r.score !== 'Vencida');
+}
 async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
   if (url.startsWith('COMPRASMX_API:')) {
     const keywords = url.replace('COMPRASMX_API:', '');
@@ -581,6 +628,7 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
     if (url.includes('licitaciones.puebla.gob.mx')) return await analizarPuebla(url, nombrePortal);
     if (url.includes('concursodigital.finanzas.cdmx.gob.mx')) return await analizarCDMX(url, nombrePortal);
     if (url.includes('comprasestatal.durango.gob.mx')) return await analizarDurango(url, nombrePortal);
+    if (url.includes('transparencia.guadalajara.gob.mx')) return await analizarGuadalajara(url, nombrePortal);
 
     const respuestaIndice = await llamarIA(PROMPT_INDICE(url, nombrePortal, contenidoIndice, criteriosAprendizaje), 1500);
     const jsonIndice = limpiarJSON(respuestaIndice);
