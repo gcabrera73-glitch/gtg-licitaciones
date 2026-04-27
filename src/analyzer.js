@@ -573,8 +573,19 @@ async function analizarGuadalajara(url, nombrePortal) {
       // Extraer título del span
       const spanMatch = fila.match(/<span[^>]*>([^<]{30,400})<\/span>/i);
       if (!spanMatch) continue;
-      const titulo = spanMatch[1].replace(/&quot;/g, '"').replace(/&#[0-9]+;/g, '').trim().substring(0, 250);
+      const titulo = spanMatch[1]
+        .replace(/&Oacute;/g, 'Ó').replace(/&oacute;/g, 'ó')
+        .replace(/&Uacute;/g, 'Ú').replace(/&uacute;/g, 'ú')
+        .replace(/&Aacute;/g, 'Á').replace(/&aacute;/g, 'á')
+        .replace(/&Eacute;/g, 'É').replace(/&eacute;/g, 'é')
+        .replace(/&Iacute;/g, 'Í').replace(/&iacute;/g, 'í')
+        .replace(/&Ntilde;/g, 'Ñ').replace(/&ntilde;/g, 'ñ')
+        .replace(/&quot;/g, '"').replace(/&#[0-9]+;/g, '').trim().substring(0, 250);
       if (!titulo || titulo.length < 20) continue;
+
+      // Filtrar licitaciones de 2025 o anteriores
+      const añoMatch = titulo.match(/-(20\d{2})[^\d]/);
+      if (añoMatch && parseInt(añoMatch[1]) < 2026) continue;
 
       // Extraer link al PDF de convocatoria en esa fila
       const pdfMatch = fila.match(/href=["']([^"']*\/sites\/default\/files\/uploads\/[^"']*\.pdf[^"']*)/i);
