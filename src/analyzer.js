@@ -80,11 +80,10 @@ async function fetchContenido(url) {
         if (data.text && data.text.trim().length > 100) {
           return data.text.substring(0, 40000);
         }
-        return null; // PDF escaneado sin texto
+        return null;
       } catch(e) { return null; }
     }
 
-    // Leer DOCX
     if (url.endsWith('.docx') || contentType.includes('officedocument')) {
       try {
         const mammoth = require('mammoth');
@@ -120,7 +119,6 @@ async function fetchContenido(url) {
       .substring(0, 40000);
 
     if (links.length > 0) {
-      // Para CIBNOR, incluir todos los PDFs de convocatorias TI
       const pdfsTI = links.filter(l => /firewall|nac|red|lan|wlan|centro.*datos|internet|telefonia|videoconfer|computo|cctv|seguridad/i.test(l));
       const pdfsTexto = pdfsTI.length > 0 ? pdfsTI : links.slice(0, 8);
       texto += '\n\nPDFs de convocatorias en esta pagina:\n' + pdfsTexto.join('\n');
@@ -132,7 +130,6 @@ async function fetchContenido(url) {
 }
 
 async function leerURLconClaude(url) {
-  // Usa la API de Claude con tool de web_search para leer el URL directamente
   try {
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
@@ -209,14 +206,8 @@ REGLAS:
 
 IMPORTANTE PARA url_detalle:
 - Si hay links a licitaciones individuales, usa esa URL
-- Si la pagina es tipo Sinaloa (tabla con columnas Junta/Apertura/Fallo), usa null — las fechas se determinan por presencia de documentos
+- Si la pagina es tipo Sinaloa (tabla con columnas Junta/Apertura/Fallo), usa null
 - Si no hay URL especifica, usa null
-
-PARA PORTALES TIPO SINALOA (tabla con documentos por columna):
-- Si la licitacion tiene columna FALLO con documento = ya adjudicada, DESCARTAR
-- Si la licitacion NO tiene FALLO pero tiene ACTA APERTURA = proceso cerrado, DESCARTAR  
-- Si la licitacion solo tiene CONVOCATORIA sin actas = VIGENTE, incluir
-- Extrae la descripcion completa de la licitacion como resumen
 
 Portal: ${nombre}
 URL: ${url}
@@ -247,7 +238,6 @@ Extrae las fechas buscando CUALQUIERA de estos patrones:
 - "Vigencia: DD al DD de mes de YYYY" -> usa la fecha final como fecha_entrega
 - "Fecha limite", "Fecha de cierre", "Fecha de recepcion" -> fecha_entrega
 - Fechas en formato "DD de mes de YYYY", "DD/MM/YYYY", o "YYYY-MM-DD"
-Si encuentras "Vigencia: X al Y", usa Y como fecha_entrega.
 
 Portal: ${nombre}
 URL: ${url}
@@ -272,35 +262,20 @@ Responde SOLO con JSON valido:
   ]
 }`;
 
-
 async function consultarComprasMX(keywords) {
   const resultados = [];
   try {
     const response = await axios.post(
       'https://upcp-cnetservicios.buengobierno.gob.mx/whitney/sitiopublico/expedientes?rows=100&page=1',
       {
-        id_ley: null,
-        id_tipo_procedimiento: null,
-        id_tipo_contratacion: null,
-        fecha_apertura_inicio: null,
-        fecha_apertura_fin: null,
-        fecha_publicacion_inicio: null,
-        fecha_publicacion_fin: null,
-        id_estatus: 1,
-        id_proceso: 0,
-        nombre_procedimiento: keywords,
-        numero_procedimiento: null,
-        id_entidad_federativa: [],
-        id_tipo_dependencia: [],
-        id_p_especifica: [],
-        estatus_alterno: [],
-        compra_consolidada: false,
-        credito_externo: null,
-        exclusivo_mipymes: null,
-        id_caracter_procedimiento: null,
-        id_forma_participacion: null,
-        codigo_expediente: null,
-        codigo_procedimiento: null
+        id_ley: null, id_tipo_procedimiento: null, id_tipo_contratacion: null,
+        fecha_apertura_inicio: null, fecha_apertura_fin: null,
+        fecha_publicacion_inicio: null, fecha_publicacion_fin: null,
+        id_estatus: 1, id_proceso: 0, nombre_procedimiento: keywords,
+        numero_procedimiento: null, id_entidad_federativa: [], id_tipo_dependencia: [],
+        id_p_especifica: [], estatus_alterno: [], compra_consolidada: false,
+        credito_externo: null, exclusivo_mipymes: null, id_caracter_procedimiento: null,
+        id_forma_participacion: null, codigo_expediente: null, codigo_procedimiento: null
       },
       {
         headers: {
@@ -312,35 +287,20 @@ async function consultarComprasMX(keywords) {
         timeout: 30000
       }
     );
-
     const data = response.data;
-    const expedientes = data.data || data.expedientes || data.results || data || [];
-    const lista = Array.isArray(expedientes) ? expedientes : [];
-
+    const lista = Array.isArray(data.data || data.expedientes || data.results || data) ? (data.data || data.expedientes || data.results || data) : [];
     for (const exp of lista) {
-      const titulo = exp.nombre_procedimiento || exp.titulo || exp.descripcion || '';
+      const titulo = exp.nombre_procedimiento || exp.titulo || '';
       const numero = exp.numero_procedimiento || exp.codigo_procedimiento || '';
-      const dependencia = exp.nombre_dependencia || exp.institucion || exp.unidad_compradora || '';
-      const fechaApertura = exp.fecha_apertura_proposiciones || exp.fecha_apertura || '';
-      const fechaFallo = exp.fecha_fallo || '';
-      const fechaJunta = exp.fecha_junta_aclaraciones || '';
-      const urlDetalle = exp.id_expediente ?
-        'https://upcp-compranet.buengobierno.gob.mx/sitiopublico/#/sitiopublico/detalle/' + exp.id_expediente + '/procedimiento' :
-        'https://upcp-compranet.buengobierno.gob.mx/sitiopublico/';
-
+      const dependencia = exp.nombre_dependencia || exp.institucion || '';
+      const urlDetalle = exp.id_expediente ? 'https://upcp-compranet.buengobierno.gob.mx/sitiopublico/#/sitiopublico/detalle/' + exp.id_expediente + '/procedimiento' : 'https://upcp-compranet.buengobierno.gob.mx/sitiopublico/';
       resultados.push({
-        titulo: titulo,
-        dependencia: dependencia,
-        tipo: 'No determinado',
-        score: 'Revisar',
-        marcas: 'Ninguna',
-        junta_aclaraciones: fechaJunta || 'No especificada',
-        fecha_entrega: fechaApertura || 'No especificada',
-        fallo: fechaFallo || 'No especificada',
+        titulo, dependencia, tipo: 'No determinado', score: 'Revisar', marcas: 'Ninguna',
+        junta_aclaraciones: exp.fecha_junta_aclaraciones || 'No especificada',
+        fecha_entrega: exp.fecha_apertura_proposiciones || 'No especificada',
+        fallo: exp.fecha_fallo || 'No especificada',
         justificacion: 'Licitacion vigente en ComprasMX: ' + keywords,
-        numero_licitacion: numero,
-        portal_url: urlDetalle,
-        portal_nombre: 'ComprasMX Federal',
+        numero_licitacion: numero, portal_url: urlDetalle, portal_nombre: 'ComprasMX Federal',
         hash: crypto.createHash('md5').update('comprasmx' + (numero || titulo)).digest('hex')
       });
     }
@@ -351,87 +311,47 @@ async function consultarComprasMX(keywords) {
   return resultados;
 }
 
-
 async function analizarSinaloa(url, nombrePortal, htmlContenido) {
   const resultados = [];
-  const HOY_TS = HOY.getTime();
-
-  // Extraer tabla de licitaciones del HTML
-  // Buscar filas que contengan palabras clave de TI
   const palabrasTI = [
-      'telecomunicacion', 'internet dedicado', 'red de datos', 'redes de computo',
-      'infraestructura de red', 'computo y comunicaciones', 'tecnologias de informacion',
-      'firewall', 'switch ', 'router', 'wi-fi', 'wifi', 'cctv', 'videovigilancia',
-      'fibra optica', 'noc ', 'mesa de servicio', 'mesa de ayuda',
-      'soporte tecnico', 'mantenimiento de equipo de computo',
-      'mantenimiento de red', 'licenciamiento', 'licencias de software',
-      'sistema de videovigilancia', 'equipo de radiocomunicacion',
-      'enlaces de datos', 'servicio de conectividad', 'seguridad informatica'
-    ];
-
-  // Extraer links de DOCX/PDF de convocatoria del HTML original
-  // Necesitamos el HTML completo, no el texto
+    'telecomunicacion', 'internet dedicado', 'red de datos', 'redes de computo',
+    'infraestructura de red', 'computo y comunicaciones', 'tecnologias de informacion',
+    'firewall', 'switch ', 'router', 'wi-fi', 'wifi', 'cctv', 'videovigilancia',
+    'fibra optica', 'noc ', 'mesa de servicio', 'mesa de ayuda',
+    'soporte tecnico', 'mantenimiento de equipo de computo',
+    'mantenimiento de red', 'licenciamiento', 'licencias de software',
+    'sistema de videovigilancia', 'equipo de radiocomunicacion',
+    'enlaces de datos', 'servicio de conectividad', 'seguridad informatica'
+  ];
   try {
-    const response = await axios.get(url, {
-      timeout: 25000, headers: HEADERS, maxRedirects: 5,
-      responseType: 'arraybuffer'
-    });
+    const response = await axios.get(url, { timeout: 25000, headers: HEADERS, maxRedirects: 5, responseType: 'arraybuffer' });
     const html = Buffer.from(response.data).toString('utf-8');
-
-    // Dividir por filas de tabla (cada licitacion es una fila)
     const filas = html.split('<tr').slice(1);
-
     for (const fila of filas) {
-      // Verificar si contiene palabras de TI
-      const filaLower = fila.toLowerCase()
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/\s+/g, ' ');
-
+      const filaLower = fila.toLowerCase().replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
       const esTI = palabrasTI.some(p => new RegExp(p, 'i').test(filaLower));
       if (!esTI) continue;
-
-      // Verificar si ya tiene FALLO (adjudicada)
-      if (fila.toLowerCase().includes('acta de fallo') || fila.toLowerCase().includes('acta_de_fallo')) {
-        continue; // Ya adjudicada, saltar
-      }
-
-      // Solo incluir 2026 y 2025 recientes
+      if (fila.toLowerCase().includes('acta de fallo') || fila.toLowerCase().includes('acta_de_fallo')) continue;
       const tieneAñoViejo = /\/202[0-4]|-202[0-4]|_202[0-4]/.test(fila);
       if (tieneAñoViejo) continue;
-
-      // Extraer titulo
       const tituloMatch = fila.match(/<td[^>]*>([^<]{20,200})<\/td>/);
       const titulo = tituloMatch ? tituloMatch[1].trim() : 'Licitacion Sinaloa';
-
-      // Buscar link a DOCX de resumen de convocatoria
-      // El texto del link dice "RESUMEN DE CONVOCATORIA" pero la URL es /uploads/files/hash.docx
       const resumenMatch = fila.match(/resumen[^<]*<\/a>/i);
       let urlDetalle = null;
       if (resumenMatch) {
         const hrefMatch = fila.match(/href=["']([^"']*\.docx[^"']*)/i);
-        if (hrefMatch) {
-          urlDetalle = hrefMatch[1].startsWith('http') ? hrefMatch[1] : 'https://compranet.sinaloa.gob.mx' + hrefMatch[1];
-        }
+        if (hrefMatch) urlDetalle = hrefMatch[1].startsWith('http') ? hrefMatch[1] : 'https://compranet.sinaloa.gob.mx' + hrefMatch[1];
       }
-      // Si no hay resumen, buscar cualquier DOCX de convocatoria
       if (!urlDetalle) {
-        const convMatch = fila.match(/convocatoria[^<]*href=["']([^"']*\.docx)/i) || 
-                          fila.match(/href=["']([^"']*\.docx)[^"']*"[^>]*>\s*(?:convocatoria|resumen)/i);
-        if (convMatch) {
-          urlDetalle = convMatch[1].startsWith('http') ? convMatch[1] : 'https://compranet.sinaloa.gob.mx' + convMatch[1];
-        }
+        const convMatch = fila.match(/convocatoria[^<]*href=["']([^"']*\.docx)/i) || fila.match(/href=["']([^"']*\.docx)[^"']*"[^>]*>\s*(?:convocatoria|resumen)/i);
+        if (convMatch) urlDetalle = convMatch[1].startsWith('http') ? convMatch[1] : 'https://compranet.sinaloa.gob.mx' + convMatch[1];
       }
-
       console.log('  Sinaloa TI vigente: ' + titulo.substring(0, 60));
-
       if (urlDetalle) {
-        // Leer el DOCX para extraer fechas
         await new Promise(r => setTimeout(r, 2000));
         const contenidoDoc = await fetchContenido(urlDetalle);
         if (contenidoDoc && contenidoDoc.length > 100) {
-          const respFechas = await llamarIA(
-            PROMPT_DETALLE(urlDetalle, nombrePortal, contenidoDoc), 700
-          );
+          const respFechas = await llamarIA(PROMPT_DETALLE(urlDetalle, nombrePortal, contenidoDoc), 700);
           const jsonFechas = limpiarJSON(respFechas);
           if (jsonFechas) {
             const detalle = JSON.parse(jsonFechas);
@@ -439,12 +359,8 @@ async function analizarSinaloa(url, nombrePortal, htmlContenido) {
             for (const lic of lics) {
               if (!lic.titulo || lic.score === 'No relevante') continue;
               console.log('  Fechas Sinaloa - Fallo: ' + lic.fallo + ' | Entrega: ' + lic.fecha_entrega);
-              if (licitacionVencida(lic)) {
-                console.log('  Vencida Sinaloa: ' + (lic.titulo||'').substring(0,50));
-                continue;
-              }
-              lic.portal_url = urlDetalle;
-              lic.portal_nombre = nombrePortal;
+              if (licitacionVencida(lic)) { console.log('  Vencida Sinaloa: ' + (lic.titulo||'').substring(0,50)); continue; }
+              lic.portal_url = urlDetalle; lic.portal_nombre = nombrePortal;
               lic.hash = crypto.createHash('md5').update(url + titulo).digest('hex');
               resultados.push(lic);
             }
@@ -452,170 +368,99 @@ async function analizarSinaloa(url, nombrePortal, htmlContenido) {
           }
         }
       }
-
-      // Sin DOCX — agregar con info básica
-      resultados.push({
-        titulo: titulo,
-        dependencia: nombrePortal,
-        tipo: 'No determinado',
-        score: 'Medio',
-        marcas: 'Ninguna',
-        junta_aclaraciones: 'No especificada',
-        fecha_entrega: 'No especificada',
-        fallo: 'No especificada',
-        justificacion: 'Licitacion TI vigente en Sinaloa (sin fallo publicado)',
-        portal_url: url,
-        portal_nombre: nombrePortal,
-        hash: crypto.createHash('md5').update(url + titulo).digest('hex'),
-      });
+      resultados.push({ titulo, dependencia: nombrePortal, tipo: 'No determinado', score: 'Medio', marcas: 'Ninguna', junta_aclaraciones: 'No especificada', fecha_entrega: 'No especificada', fallo: 'No especificada', justificacion: 'Licitacion TI vigente en Sinaloa', portal_url: url, portal_nombre: nombrePortal, hash: crypto.createHash('md5').update(url + titulo).digest('hex') });
     }
-
     console.log('  ' + nombrePortal + ': ' + resultados.length + ' relevantes vigentes');
-  } catch(e) {
-    console.log('  Error Sinaloa: ' + e.message.substring(0, 80));
-  }
-
+  } catch(e) { console.log('  Error Sinaloa: ' + e.message.substring(0, 80)); }
   return resultados;
 }
-
 
 async function analizarCIBNOR(url, nombrePortal) {
   const resultados = [];
   try {
-    // Obtener el HTML completo sin límite de caracteres
-    const response = await axios.get(url, {
-      timeout: 25000, headers: HEADERS, maxRedirects: 5,
-      responseType: 'arraybuffer'
-    });
+    const response = await axios.get(url, { timeout: 25000, headers: HEADERS, maxRedirects: 5, responseType: 'arraybuffer' });
     const html = Buffer.from(response.data).toString('utf-8');
-
-    // Extraer todos los links a PDFs de convocatorias
     const linkRegex = /href=["']([^"']*\/files\/admon\/convocatorias\/[^"']*\.pdf[^"']*)/gi;
     const links = [];
     let m;
     while ((m = linkRegex.exec(html)) !== null) {
       let pdfUrl = m[1];
-      if (!pdfUrl.startsWith('http')) {
-        pdfUrl = 'https://cibnor.mx' + pdfUrl;
-      }
+      if (!pdfUrl.startsWith('http')) pdfUrl = 'https://cibnor.mx' + pdfUrl;
       links.push(pdfUrl);
     }
-
-    // Solo PDFs de 2026
     const links2026 = links.filter(l => l.includes('2026') || l.includes('-26_') || l.includes('-26.') || l.includes('_26_') || /-N-\d{2}-26/i.test(l));
     console.log('  CIBNOR PDFs 2026 encontrados: ' + links2026.length);
-
     for (const pdfUrl of links2026) {
       await new Promise(r => setTimeout(r, 12000));
       try {
         const contenidoPDF = await fetchContenido(pdfUrl);
         if (!contenidoPDF || contenidoPDF.length < 100) continue;
-
-        const respFechas = await llamarIA(
-          PROMPT_DETALLE(pdfUrl, nombrePortal, contenidoPDF), 700
-        );
+        const respFechas = await llamarIA(PROMPT_DETALLE(pdfUrl, nombrePortal, contenidoPDF), 700);
         const jsonFechas = limpiarJSON(respFechas);
         if (!jsonFechas) continue;
-
         const detalle = JSON.parse(jsonFechas);
         const lics = detalle.licitaciones || [detalle];
-
         for (const lic of lics) {
           if (!lic.titulo || lic.score === 'No relevante') continue;
           console.log('  CIBNOR Fechas - Fallo: ' + lic.fallo + ' | Entrega: ' + lic.fecha_entrega);
-          if (licitacionVencida(lic)) {
-            console.log('  Vencida CIBNOR: ' + (lic.titulo||'').substring(0, 50));
-            continue;
-          }
-          lic.portal_url = pdfUrl;
-          lic.portal_nombre = nombrePortal;
+          if (licitacionVencida(lic)) { console.log('  Vencida CIBNOR: ' + (lic.titulo||'').substring(0, 50)); continue; }
+          lic.portal_url = pdfUrl; lic.portal_nombre = nombrePortal;
           lic.hash = crypto.createHash('md5').update(pdfUrl + (lic.titulo||'')).digest('hex');
           resultados.push(lic);
         }
-      } catch(e) {
-        console.log('  Error CIBNOR PDF: ' + e.message.substring(0, 60));
-      }
+      } catch(e) { console.log('  Error CIBNOR PDF: ' + e.message.substring(0, 60)); }
     }
     console.log('  ' + nombrePortal + ': ' + resultados.length + ' relevantes vigentes');
-  } catch(e) {
-    console.log('  Error CIBNOR: ' + e.message.substring(0, 80));
-  }
+  } catch(e) { console.log('  Error CIBNOR: ' + e.message.substring(0, 80)); }
   return resultados;
 }
-
 
 async function analizarPuebla(url, nombrePortal) {
   const resultados = [];
   try {
-    const response = await axios.get(url, {
-      timeout: 25000, headers: HEADERS, maxRedirects: 5,
-      responseType: 'arraybuffer'
-    });
+    const response = await axios.get(url, { timeout: 25000, headers: HEADERS, maxRedirects: 5, responseType: 'arraybuffer' });
     const html = Buffer.from(response.data).toString('utf-8');
-
-    // Extraer todos los links a PDFs de la página completa
     const linkRegex = /href=["']([^"']*\/images\/[^"']*\.pdf[^"']*)/gi;
     const todosLinks = [];
     let m;
     while ((m = linkRegex.exec(html)) !== null) {
       let pdfUrl = m[1];
-      if (!pdfUrl.startsWith('http')) {
-        pdfUrl = 'https://licitaciones.puebla.gob.mx' + pdfUrl;
-      }
+      if (!pdfUrl.startsWith('http')) pdfUrl = 'https://licitaciones.puebla.gob.mx' + pdfUrl;
       todosLinks.push(pdfUrl);
     }
-
-    // Filtrar PDFs con palabras TI en el nombre del archivo
+    // Filtro mejorado: incluye equipos_menores, tic, y excluye palabras ambiguas
     const palabrasTI = /tecnolog|tic_|_tic|computo|telecomunicac|internet|red_lan|redes|firewall|switch|router|wifi|cctv|videovigilancia|fibra|soporte_tecnico|soporte_empresarial|infraestructura.*red|licencias|software|servidor|seguridad.*informatica|satelital|equipos_menores/i;
-    // Solo procesar PDFs de 2026 para evitar historial
     const pdfsTI = todosLinks.filter(l => palabrasTI.test(l) && l.includes('2026'));
-
     console.log('  Puebla PDFs TI encontrados: ' + pdfsTI.length + ' de ' + todosLinks.length + ' totales');
-
     for (const pdfUrl of pdfsTI) {
       await new Promise(r => setTimeout(r, 8000));
       try {
         const contenidoPDF = await fetchContenido(pdfUrl);
         if (!contenidoPDF || contenidoPDF.length < 100) continue;
-
-        const respFechas = await llamarIA(
-          PROMPT_DETALLE(pdfUrl, nombrePortal, contenidoPDF), 700
-        );
+        const respFechas = await llamarIA(PROMPT_DETALLE(pdfUrl, nombrePortal, contenidoPDF), 700);
         const jsonFechas = limpiarJSON(respFechas);
         if (!jsonFechas) continue;
-
         const detalle = JSON.parse(jsonFechas);
         const lics = detalle.licitaciones || [detalle];
-
         for (const lic of lics) {
           if (!lic.titulo || lic.score === 'No relevante') continue;
           console.log('  Puebla Fechas - Fallo: ' + lic.fallo + ' | Entrega: ' + lic.fecha_entrega);
-          lic.portal_url = pdfUrl;
-          lic.portal_nombre = nombrePortal;
+          lic.portal_url = pdfUrl; lic.portal_nombre = nombrePortal;
           lic.hash = crypto.createHash('md5').update(pdfUrl + (lic.titulo || '')).digest('hex');
-          if (licitacionVencida(lic)) {
-            console.log('  Vencida Puebla: ' + (lic.titulo || '').substring(0, 50));
-            lic.score = 'Vencida';
-          }
+          if (licitacionVencida(lic)) { console.log('  Vencida Puebla: ' + (lic.titulo || '').substring(0, 50)); lic.score = 'Vencida'; }
           resultados.push(lic);
         }
-      } catch(e) {
-        console.log('  Error Puebla PDF: ' + e.message.substring(0, 60));
-      }
+      } catch(e) { console.log('  Error Puebla PDF: ' + e.message.substring(0, 60)); }
     }
     console.log('  ' + nombrePortal + ': ' + resultados.filter(r => r.score !== 'Vencida').length + ' relevantes vigentes de ' + resultados.length);
-  } catch(e) {
-    console.log('  Error Puebla: ' + e.message.substring(0, 80));
-  }
+  } catch(e) { console.log('  Error Puebla: ' + e.message.substring(0, 80)); }
   return resultados.filter(r => r.score !== 'Vencida');
 }
 
 async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
-  // Manejo especial para API de ComprasMX
   if (url.startsWith('COMPRASMX_API:')) {
     const keywords = url.replace('COMPRASMX_API:', '');
     const resultados = await consultarComprasMX(keywords);
-    // Filtrar con IA para asignar score correcto
     const relevantes = [];
     for (const r of resultados) {
       const tituloLower = r.titulo.toLowerCase();
@@ -623,12 +468,8 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
       const relevante = palabrasGTG.some(p => tituloLower.includes(p));
       if (relevante) {
         r.score = 'Medio';
-        // Verificar si está vencida
-        if (!licitacionVencida(r)) {
-          relevantes.push(r);
-        } else {
-          console.log('  Vencida ComprasMX: ' + r.titulo.substring(0, 50));
-        }
+        if (!licitacionVencida(r)) relevantes.push(r);
+        else console.log('  Vencida ComprasMX: ' + r.titulo.substring(0, 50));
       }
     }
     console.log('  ' + nombrePortal + ': ' + relevantes.length + ' relevantes de ' + resultados.length);
@@ -636,89 +477,47 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
   }
 
   const resultados = [];
-
   try {
     const contenidoIndice = await fetchContenido(url);
-    if (!contenidoIndice) {
-      console.log('  No se pudo acceder a ' + nombrePortal);
-      return [];
-    }
+    if (!contenidoIndice) { console.log('  No se pudo acceder a ' + nombrePortal); return []; }
 
-    // Procesamiento especial para portales tipo Sinaloa (tabla con documentos)
-    if (url.includes('compranet.sinaloa.gob.mx')) {
-      return await analizarSinaloa(url, nombrePortal, contenidoIndice);
-    }
+    if (url.includes('compranet.sinaloa.gob.mx')) return await analizarSinaloa(url, nombrePortal, contenidoIndice);
+    if (url.includes('cibnor.mx')) return await analizarCIBNOR(url, nombrePortal);
+    if (url.includes('licitaciones.puebla.gob.mx')) return await analizarPuebla(url, nombrePortal);
 
-    // Procesamiento especial para CIBNOR - extraer PDFs directamente del HTML
-    if (url.includes('cibnor.mx')) {
-      return await analizarCIBNOR(url, nombrePortal);
-    }
-
-    // Procesamiento especial para Puebla - extraer PDFs de TI directamente
-    if (url.includes('licitaciones.puebla.gob.mx')) {
-      return await analizarPuebla(url, nombrePortal);
-    }
-
-    const respuestaIndice = await llamarIA(
-      PROMPT_INDICE(url, nombrePortal, contenidoIndice, criteriosAprendizaje),
-      1500
-    );
-
+    const respuestaIndice = await llamarIA(PROMPT_INDICE(url, nombrePortal, contenidoIndice, criteriosAprendizaje), 1500);
     const jsonIndice = limpiarJSON(respuestaIndice);
-    if (!jsonIndice) {
-      console.log('  Sin JSON en indice de ' + nombrePortal);
-      return [];
-    }
+    if (!jsonIndice) { console.log('  Sin JSON en indice de ' + nombrePortal); return []; }
 
     const indice = JSON.parse(jsonIndice);
-    // Filtrar licitaciones con años anteriores a 2025 en el título o número
     const AÑO_MIN = 2025;
     const licitaciones = (indice.licitaciones || []).filter(lic => {
       const texto = (lic.titulo || '') + (lic.resumen || '');
-      // Buscar años explícitos en el texto
-      // Solo detectar año en contexto de número de licitación (precedido de / - _)
       const añoMatch = texto.match(/[\/\-_](20\d{2})[^\d]/);
       if (añoMatch) {
         const año = parseInt(añoMatch[1]);
-        if (año < AÑO_MIN) {
-          console.log('  Descartada por año ' + año + ': ' + texto.substring(0, 50));
-          return false;
-        }
+        if (año < AÑO_MIN) { console.log('  Descartada por año ' + año + ': ' + texto.substring(0, 50)); return false; }
       }
       return true;
     });
 
-    if (licitaciones.length === 0) {
-      console.log('  Sin relevantes en ' + nombrePortal);
-      return [];
-    }
-
+    if (licitaciones.length === 0) { console.log('  Sin relevantes en ' + nombrePortal); return []; }
     console.log('  ' + nombrePortal + ': ' + licitaciones.length + ' relevantes detectadas');
 
-    const urlsUnicas = [...new Set(
-      licitaciones
-        .map(l => l.url_detalle)
-        .filter(u => u && u !== 'null' && u.startsWith('http'))
-    )];
-
-    const licitacionesSinUrl = licitaciones.filter(
-      l => !l.url_detalle || l.url_detalle === 'null' || !l.url_detalle.startsWith('http')
-    );
+    const urlsUnicas = [...new Set(licitaciones.map(l => l.url_detalle).filter(u => u && u !== 'null' && u.startsWith('http')))];
+    const licitacionesSinUrl = licitaciones.filter(l => !l.url_detalle || l.url_detalle === 'null' || !l.url_detalle.startsWith('http'));
 
     for (const urlDetalle of urlsUnicas) {
       await new Promise(r => setTimeout(r, 5000));
       try {
         let resultado = null;
-
-        // Si es PDF, leer con Claude directamente
-        if (urlDetalle.toLowerCase().endsWith('.pdf') || urlDetalle.toLowerCase().includes('.pdf')) {
+        if (urlDetalle.toLowerCase().includes('.pdf')) {
           console.log('  Leyendo PDF con Claude: ' + urlDetalle.substring(0, 60));
           const datosClaudeURL = await leerURLconClaude(urlDetalle);
           if (datosClaudeURL) {
             resultado = {
               titulo: datosClaudeURL.titulo || licitaciones.find(l => l.url_detalle === urlDetalle)?.titulo || 'Sin titulo',
-              dependencia: nombrePortal,
-              tipo: 'No determinado',
+              dependencia: nombrePortal, tipo: 'No determinado',
               score: licitaciones.find(l => l.url_detalle === urlDetalle)?.score_preliminar || 'Medio',
               marcas: 'Ninguna',
               junta_aclaraciones: datosClaudeURL.junta_aclaraciones || 'No especificada',
@@ -730,79 +529,39 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
             console.log('  Fechas Claude - Fallo: ' + resultado.fallo + ' | Entrega: ' + resultado.fecha_entrega);
           }
         }
-
-        // Si no es PDF o Claude no funcionó, usar fetch normal
         if (!resultado) {
           const contenidoDetalle = await fetchContenido(urlDetalle);
           if (!contenidoDetalle) continue;
-
-          const respuestaDetalle = await llamarIA(
-            PROMPT_DETALLE(urlDetalle, nombrePortal, contenidoDetalle),
-            1500
-          );
+          const respuestaDetalle = await llamarIA(PROMPT_DETALLE(urlDetalle, nombrePortal, contenidoDetalle), 1500);
           const jsonDetalle = limpiarJSON(respuestaDetalle);
           if (!jsonDetalle) continue;
-
           const detalle = JSON.parse(jsonDetalle);
           const lics = detalle.licitaciones || [detalle];
-
           for (const lic of lics) {
             if (!lic.titulo || lic.score === 'No relevante') continue;
             console.log('  Fechas fetch - Fallo: ' + lic.fallo + ' | Entrega: ' + lic.fecha_entrega);
-            lic.portal_url = urlDetalle;
-            lic.portal_nombre = nombrePortal;
-            lic.hash = crypto.createHash('md5')
-              .update(urlDetalle + (lic.titulo || '') + (lic.numero_licitacion || ''))
-              .digest('hex');
-            if (licitacionVencida(lic)) {
-              console.log('  Vencida: ' + (lic.titulo || '').substring(0, 50));
-              lic.score = 'Vencida'; // Guardar con fechas pero score Vencida
-            }
+            lic.portal_url = urlDetalle; lic.portal_nombre = nombrePortal;
+            lic.hash = crypto.createHash('md5').update(urlDetalle + (lic.titulo || '') + (lic.numero_licitacion || '')).digest('hex');
+            if (licitacionVencida(lic)) { console.log('  Vencida: ' + (lic.titulo || '').substring(0, 50)); lic.score = 'Vencida'; }
             resultados.push(lic);
           }
           continue;
         }
-
         if (resultado) {
-          if (licitacionVencida(resultado)) {
-            console.log('  Vencida (PDF): ' + resultado.titulo.substring(0, 50));
-          } else {
+          if (licitacionVencida(resultado)) { console.log('  Vencida (PDF): ' + resultado.titulo.substring(0, 50)); }
+          else {
             resultado.portal_nombre = nombrePortal;
-            resultado.hash = crypto.createHash('md5')
-              .update(urlDetalle + (resultado.titulo || ''))
-              .digest('hex');
+            resultado.hash = crypto.createHash('md5').update(urlDetalle + (resultado.titulo || '')).digest('hex');
             resultados.push(resultado);
           }
         }
-
-      } catch(e) {
-        console.log('  Error en detalle: ' + e.message.substring(0, 60));
-      }
+      } catch(e) { console.log('  Error en detalle: ' + e.message.substring(0, 60)); }
     }
 
     for (const lic of licitacionesSinUrl) {
-      resultados.push({
-        titulo: lic.titulo,
-        dependencia: nombrePortal,
-        tipo: 'No determinado',
-        score: lic.score_preliminar || 'Revisar',
-        marcas: 'Ninguna',
-        junta_aclaraciones: 'No especificada',
-        fecha_entrega: 'No especificada',
-        fallo: 'No especificada',
-        justificacion: lic.resumen || 'Detectada en indice sin link de detalle',
-        numero_licitacion: 'No especificado',
-        portal_url: url,
-        portal_nombre: nombrePortal,
-        hash: crypto.createHash('md5')
-          .update(url + (lic.titulo || '') + Date.now().toString())
-          .digest('hex'),
-      });
+      resultados.push({ titulo: lic.titulo, dependencia: nombrePortal, tipo: 'No determinado', score: lic.score_preliminar || 'Revisar', marcas: 'Ninguna', junta_aclaraciones: 'No especificada', fecha_entrega: 'No especificada', fallo: 'No especificada', justificacion: lic.resumen || 'Detectada en indice sin link de detalle', numero_licitacion: 'No especificado', portal_url: url, portal_nombre: nombrePortal, hash: crypto.createHash('md5').update(url + (lic.titulo || '') + Date.now().toString()).digest('hex') });
     }
-
-  } catch (error) {
-    console.error('Error analizando ' + nombrePortal + ': ' + error.message.substring(0, 100));
-  }
+  } catch (error) { console.error('Error analizando ' + nombrePortal + ': ' + error.message.substring(0, 100)); }
 
   return resultados;
 }
