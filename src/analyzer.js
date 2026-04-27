@@ -383,7 +383,7 @@ async function analizarCIBNOR(url, nombrePortal) {
       if (!pdfUrl.startsWith('http')) pdfUrl = 'https://cibnor.mx' + pdfUrl;
       links.push(pdfUrl);
     }
-    const links2026 = links.filter(l => l.includes('2026') || l.includes('-26_') || l.includes('-26.') || l.includes('_26_') || /-N-\d{2}-26/i.test(l));
+    const links2026 = [...new Set(links.filter(l => l.includes('2026') || l.includes('-26_') || l.includes('-26.') || l.includes('_26_') || /-N-\d{2}-26/i.test(l)))];
     console.log('  CIBNOR PDFs 2026 encontrados: ' + links2026.length);
     for (const pdfUrl of links2026) {
       await new Promise(r => setTimeout(r, 12000));
