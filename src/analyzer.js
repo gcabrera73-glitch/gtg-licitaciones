@@ -566,7 +566,7 @@ async function analizarPuebla(url, nombrePortal) {
     }
 
     // Filtrar PDFs con palabras TI en el nombre del archivo
-    const palabrasTI = /tecnolog|computo|telecomunicac|internet|red_|redes|firewall|switch|router|wifi|cctv|videovigilancia|fibra|noc|soporte|mantenimiento.*equip|infraestructura|licencias|software|servidor|seguridad.*informatica|satelital/i;
+    const palabrasTI = /tecnolog|tic_|_tic|computo|telecomunicac|internet|red_lan|redes|firewall|switch|router|wifi|cctv|videovigilancia|fibra|soporte_tecnico|soporte_empresarial|infraestructura.*red|licencias|software|servidor|seguridad.*informatica|satelital|equipos_menores/i;
     // Solo procesar PDFs de 2026 para evitar historial
     const pdfsTI = todosLinks.filter(l => palabrasTI.test(l) && l.includes('2026'));
 
