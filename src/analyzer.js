@@ -570,10 +570,11 @@ async function analizarGuadalajara(url, nombrePortal) {
       if (!palabrasTI.test(textoFila)) continue;
       if (textoFila.length < 20) continue;
 
-      // Extraer título (texto más largo sin tags)
-      const tituloMatch = textoFila.match(/LICITACI[ÓO]N[^"]{20,300}/i) || textoFila.match(/ENAJENACI[ÓO]N[^"]{20,200}/i);
-      if (!tituloMatch) continue;
-      const titulo = tituloMatch[0].trim().substring(0, 250);
+      // Extraer título del span
+      const spanMatch = fila.match(/<span[^>]*>([^<]{30,400})<\/span>/i);
+      if (!spanMatch) continue;
+      const titulo = spanMatch[1].replace(/&quot;/g, '"').replace(/&#[0-9]+;/g, '').trim().substring(0, 250);
+      if (!titulo || titulo.length < 20) continue;
 
       // Extraer link al PDF de convocatoria en esa fila
       const pdfMatch = fila.match(/href=["']([^"']*\/sites\/default\/files\/uploads\/[^"']*\.pdf[^"']*)/i);
