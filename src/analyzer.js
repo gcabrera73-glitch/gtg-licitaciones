@@ -559,45 +559,73 @@ async function analizarGuadalajara(url, nombrePortal) {
     const response = await axios.get(url, { timeout: 25000, headers: HEADERS, maxRedirects: 5, responseType: 'arraybuffer' });
     const html = Buffer.from(response.data).toString('utf-8');
 
-    // Extraer todos los links a PDFs de convocatoria
-    const linkRegex = /href=["']([^"']*\/sites\/default\/files\/uploads\/[^"']*\.pdf[^"']*)/gi;
-    const todosLinks = [];
-    let m;
-    while ((m = linkRegex.exec(html)) !== null) {
-      let pdfUrl = m[1];
-      if (!pdfUrl.startsWith('http')) pdfUrl = 'https://transparencia.guadalajara.gob.mx' + pdfUrl;
-      if (!todosLinks.includes(pdfUrl)) todosLinks.push(pdfUrl);
+    const palabrasTI = /tecnolog|computo|telecomunicac|internet|red |redes|firewall|switch|router|wifi|cctv|videovigilancia|fibra|noc|soporte|software|servidor|seguridad|satelital|c5|conectividad|repetidores|plataforma|audiovisual|monitoreo|infraestructura/i;
+
+    // Dividir por filas de tabla
+    const filas = html.split('<tr').slice(1);
+    const licitacionesTI = [];
+
+    for (const fila of filas) {
+      const textoFila = fila.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!palabrasTI.test(textoFila)) continue;
+      if (textoFila.length < 20) continue;
+
+      // Extraer título (texto más largo sin tags)
+      const tituloMatch = textoFila.match(/LICITACI[ÓO]N[^"]{20,300}/i) || textoFila.match(/ENAJENACI[ÓO]N[^"]{20,200}/i);
+      if (!tituloMatch) continue;
+      const titulo = tituloMatch[0].trim().substring(0, 250);
+
+      // Extraer link al PDF de convocatoria en esa fila
+      const pdfMatch = fila.match(/href=["']([^"']*\/sites\/default\/files\/uploads\/[^"']*\.pdf[^"']*)/i);
+      const pdfUrl = pdfMatch ? ('https://transparencia.guadalajara.gob.mx' + pdfMatch[1]) : null;
+
+      if (!pdfUrl) continue;
+      if (licitacionesTI.some(l => l.pdfUrl === pdfUrl)) continue; // deduplicar
+
+      licitacionesTI.push({ titulo, pdfUrl });
     }
 
-    // Filtrar PDFs de convocatoria con palabras TI en el nombre
-    const palabrasTI = /tecnolog|tic|computo|telecomunicac|internet|red_|redes|firewall|switch|router|wifi|cctv|videovigilancia|fibra|noc|soporte|software|servidor|seguridad|satelital|c5|conectividad|repetidores|plataforma|audiovisual|monitoreo/i;
-    const pdfsTI = todosLinks.filter(l => palabrasTI.test(l) && /CONVOC/i.test(l));
+    console.log('  Guadalajara licitaciones TI encontradas: ' + licitacionesTI.length);
 
-    console.log('  Guadalajara PDFs TI encontrados: ' + pdfsTI.length + ' de ' + todosLinks.length + ' totales');
-
-    for (const pdfUrl of pdfsTI) {
+    for (const { titulo, pdfUrl } of licitacionesTI) {
       await new Promise(r => setTimeout(r, 8000));
       try {
         const contenidoPDF = await fetchContenido(pdfUrl);
-        if (!contenidoPDF || contenidoPDF.length < 100) continue;
-        const respFechas = await llamarIA(PROMPT_DETALLE(pdfUrl, nombrePortal, contenidoPDF), 700);
-        const jsonFechas = limpiarJSON(respFechas);
-        if (!jsonFechas) continue;
-        const detalle = JSON.parse(jsonFechas);
-        const lics = detalle.licitaciones || [detalle];
-        for (const lic of lics) {
-          if (!lic.titulo || lic.score === 'No relevante') continue;
-          console.log('  Guadalajara Fechas - Fallo: ' + lic.fallo + ' | Entrega: ' + lic.fecha_entrega);
-          lic.portal_url = pdfUrl; lic.portal_nombre = nombrePortal;
-          lic.hash = crypto.createHash('md5').update(pdfUrl + (lic.titulo || '')).digest('hex');
-          if (licitacionVencida(lic)) { console.log('  Vencida Guadalajara: ' + (lic.titulo || '').substring(0, 50)); lic.score = 'Vencida'; }
-          resultados.push(lic);
+        
+        // Si el PDF tiene texto, extraer fechas
+        if (contenidoPDF && contenidoPDF.length > 100) {
+          const respFechas = await llamarIA(PROMPT_DETALLE(pdfUrl, nombrePortal, contenidoPDF), 700);
+          const jsonFechas = limpiarJSON(respFechas);
+          if (jsonFechas) {
+            const detalle = JSON.parse(jsonFechas);
+            const lics = detalle.licitaciones || [detalle];
+            for (const lic of lics) {
+              if (!lic.titulo || lic.score === 'No relevante') continue;
+              console.log('  Guadalajara Fechas - Fallo: ' + lic.fallo + ' | Entrega: ' + lic.fecha_entrega);
+              lic.portal_url = pdfUrl; lic.portal_nombre = nombrePortal;
+              lic.hash = crypto.createHash('md5').update(pdfUrl + titulo).digest('hex');
+              if (licitacionVencida(lic)) { console.log('  Vencida Guadalajara: ' + titulo.substring(0, 50)); continue; }
+              if (lic.score === 'Revisar') lic.score = 'Medio';
+              resultados.push(lic);
+            }
+            continue;
+          }
         }
+
+        // PDF escaneado o sin texto — agregar sin fechas con score Medio
+        console.log('  Guadalajara sin fechas (PDF escaneado): ' + titulo.substring(0, 60));
+        resultados.push({
+          titulo, dependencia: nombrePortal, tipo: 'No determinado', score: 'Medio', marcas: 'Ninguna',
+          junta_aclaraciones: 'No especificada', fecha_entrega: 'No especificada', fallo: 'No especificada',
+          justificacion: 'Licitacion TI vigente en Guadalajara - verificar fechas manualmente',
+          numero_licitacion: 'No especificado', portal_url: pdfUrl, portal_nombre: nombrePortal,
+          hash: crypto.createHash('md5').update(pdfUrl + titulo).digest('hex')
+        });
       } catch(e) { console.log('  Error Guadalajara PDF: ' + e.message.substring(0, 60)); }
     }
-    console.log('  ' + nombrePortal + ': ' + resultados.filter(r => r.score !== 'Vencida').length + ' relevantes vigentes de ' + resultados.length);
+    console.log('  ' + nombrePortal + ': ' + resultados.length + ' relevantes vigentes');
   } catch(e) { console.log('  Error Guadalajara: ' + e.message.substring(0, 80)); }
-  return resultados.filter(r => r.score !== 'Vencida');
+  return resultados;
 }
 async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
   if (url.startsWith('COMPRASMX_API:')) {
