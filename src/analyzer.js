@@ -514,15 +514,15 @@ async function analizarDurango(url, nombrePortal) {
         const detHtml = Buffer.from(detResp.data).toString('utf-8');
 
         // Extraer descripción
-        const descMatch = detHtml.match(/Descripci[oó]n:[sS]*?</dt>[sS]*?<dd[^>]*>s*([^<]{10,300})s*</dd>/i);
+        const descMatch = detHtml.match(/Descripci[oó]n:[\s\S]*?<\/dt>[\s\S]*?<dd[^>]*>\s*([^<]{10,300})\s*<\/dd>/i);
         const titulo = descMatch ? descMatch[1].trim() : '';
         if (!titulo || !palabrasTI.test(titulo)) continue;
 
         // Extraer fechas directamente del HTML
-        const juntaMatch = detHtml.match(/Junta de[sS]*?Aclaraciones:[sS]*?<dd[^>]*>s*(d{4}-d{2}-d{2}s+d{2}:d{2})/i);
-        const aperturaMatch = detHtml.match(/Apertura de[sS]*?Proposiciones:[sS]*?<dd[^>]*>s*(d{4}-d{2}-d{2}s+d{2}:d{2})/i);
-        const falloMatch = detHtml.match(/Evento de[sS]*?Fallo:[sS]*?<dd[^>]*>s*(d{4}-d{2}-d{2}s+d{2}:d{2})/i);
-        const depMatch = detHtml.match(/Unidad Compradora:[sS]*?</dt>[sS]*?<dd[^>]*>[sS]*?-s*([^<]{5,100})</dd>/i);
+        const juntaMatch = detHtml.match(/Junta de[\s\S]*?Aclaraciones:[\s\S]*?<dd[^>]*>\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/i);
+        const aperturaMatch = detHtml.match(/Apertura de[\s\S]*?Proposiciones:[\s\S]*?<dd[^>]*>\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/i);
+        const falloMatch = detHtml.match(/Evento de[\s\S]*?Fallo:[\s\S]*?<dd[^>]*>\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/i);
+        const depMatch = detHtml.match(/Unidad Compradora:[\s\S]*?<\/dt>[\s\S]*?<dd[^>]*>[\s\S]*?-\s*([^<]{5,100})<\/dd>/i);
 
         const junta = juntaMatch ? juntaMatch[1] : 'No especificada';
         const apertura = aperturaMatch ? aperturaMatch[1] : 'No especificada';
