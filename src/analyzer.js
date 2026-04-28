@@ -696,6 +696,74 @@ async function analizarJalisco(url, nombrePortal) {
   return resultados;
 }
 
+async function analizarUAN(url, nombrePortal) {
+  const resultados = [];
+  const palabrasTI = /tecnolog|computo|telecomunicac|internet|fibra.optica|enlace|firewall|switch|router|wifi|cctv|videovigilancia|noc|soporte.tecnico|infraestructura|software|servidor|seguridad.informatica|licenciamiento|licencias|redes|conectividad/i;
+
+  try {
+    const response = await axios.get(url, { timeout: 25000, headers: HEADERS, maxRedirects: 5, responseType: 'arraybuffer' });
+    const html = Buffer.from(response.data).toString('utf-8');
+
+    // Dividir por bloques de licitación — cada una empieza con <h2>
+    const bloques = html.split(/<h2[^>]*>/i).slice(1);
+    console.log(`  UAN bloques encontrados: ${bloques.length}`);
+
+    for (const bloque of bloques) {
+      // Extraer título
+      const tituloMatch = bloque.match(/^([^<]{10,300})<\/h2>/i);
+      if (!tituloMatch) continue;
+      const titulo = tituloMatch[1].replace(/&quot;/g, '"').replace(/&#[0-9]+;/g, '').trim();
+      if (!titulo || titulo.length < 10) continue;
+
+      // Filtrar solo TI
+      if (!palabrasTI.test(titulo)) continue;
+
+      // Extraer número de licitación del título
+      const numMatch = titulo.match(/[A-Z]{2,3}-[\d]+-[\d]+-[\d]+-[A-Z]-[\d]+-[\d]+/i);
+      const numero = numMatch ? numMatch[0] : 'No especificado';
+
+      // Extraer fechas de la tabla
+      const juntaMatch = bloque.match(/[Jj]unta de aclaraciones[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/i);
+      const aperturaMatch = bloque.match(/[Aa]cto de presentaci[oó]n[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/i);
+      const falloMatch = bloque.match(/[Aa]cto de fallo[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/i);
+
+      const limpiarFecha = t => t ? t.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim() : 'No especificada';
+
+      const junta = limpiarFecha(juntaMatch ? juntaMatch[1] : null);
+      const apertura = limpiarFecha(aperturaMatch ? aperturaMatch[1] : null);
+      const fallo = limpiarFecha(falloMatch ? falloMatch[1] : null);
+
+      // Extraer URL de bases
+      const basesMatch = bloque.match(/href=["']([^"']*\.pdf[^"']*)/i);
+      const pdfUrl = basesMatch ? (basesMatch[1].startsWith('http') ? basesMatch[1] : 'https://www.uan.edu.mx' + basesMatch[1]) : url;
+
+      // Verificar si está vencida
+      const lic = { fallo, fecha_entrega: apertura };
+      if (licitacionVencida(lic)) {
+        console.log('  Vencida UAN: ' + titulo.substring(0, 60));
+        continue;
+      }
+
+      console.log(`  UAN TI vigente: ${titulo.substring(0, 60)}`);
+      console.log(`  UAN Fechas - Fallo: ${fallo} | Apertura: ${apertura}`);
+
+      resultados.push({
+        titulo, dependencia: 'Universidad Autónoma de Nayarit', tipo: 'No determinado',
+        score: 'Medio', marcas: 'Ninguna',
+        junta_aclaraciones: junta, fecha_entrega: apertura, fallo,
+        justificacion: 'Licitacion TI vigente en UAN Nayarit',
+        numero_licitacion: numero, portal_url: pdfUrl, portal_nombre: nombrePortal,
+        hash: crypto.createHash('md5').update(url + titulo).digest('hex')
+      });
+    }
+
+    console.log('  ' + nombrePortal + ': ' + resultados.length + ' relevantes vigentes');
+  } catch(e) {
+    console.log('  Error UAN: ' + e.message.substring(0, 80));
+  }
+  return resultados;
+}
+
 async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
   if (url.startsWith('COMPRASMX_API:')) {
     const keywords = url.replace('COMPRASMX_API:', '');
@@ -727,6 +795,7 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
     if (url.includes('comprasestatal.durango.gob.mx')) return await analizarDurango(url, nombrePortal);
     if (url.includes('compras.jalisco.gob.mx')) return await analizarJalisco(url, nombrePortal);
     if (url.includes('transparencia.guadalajara.gob.mx')) return await analizarGuadalajara(url, nombrePortal);
+    if (url.includes('uan.edu.mx')) return await analizarUAN(url, nombrePortal);
 
     const respuestaIndice = await llamarIA(PROMPT_INDICE(url, nombrePortal, contenidoIndice, criteriosAprendizaje), 1500);
     const jsonIndice = limpiarJSON(respuestaIndice);
