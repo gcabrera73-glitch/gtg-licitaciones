@@ -16,8 +16,10 @@ app.get('/api/licitaciones', (req, res) => {
   const lics = db.prepare(`
     SELECT * FROM licitaciones
     WHERE score != 'No relevante' AND score != 'Error'
-    ORDER BY CASE score WHEN 'Alto' THEN 1 WHEN 'Medio' THEN 2 WHEN 'Revisar' THEN 3 ELSE 4 END,
-    fecha_deteccion DESC
+    ORDER BY
+      CASE WHEN es_relevante = 0 THEN 1 ELSE 0 END,
+      CASE score WHEN 'Alto' THEN 1 WHEN 'Medio' THEN 2 WHEN 'Revisar' THEN 3 ELSE 4 END,
+      fecha_deteccion DESC
   `).all();
   res.setHeader('Content-Type', 'application/json');
   res.json(lics);
@@ -59,8 +61,10 @@ app.get('/', (req, res) => {
   const lics = db.prepare(`
     SELECT * FROM licitaciones
     WHERE score != 'No relevante' AND score != 'Error'
-    ORDER BY CASE score WHEN 'Alto' THEN 1 WHEN 'Medio' THEN 2 WHEN 'Revisar' THEN 3 ELSE 4 END,
-    fecha_deteccion DESC
+    ORDER BY
+      CASE WHEN es_relevante = 0 THEN 1 ELSE 0 END,
+      CASE score WHEN 'Alto' THEN 1 WHEN 'Medio' THEN 2 WHEN 'Revisar' THEN 3 ELSE 4 END,
+      fecha_deteccion DESC
   `).all();
 
   const total = lics.length;
@@ -70,6 +74,7 @@ app.get('/', (req, res) => {
 
   const cards = lics.map(l => {
     const cls = l.score === 'Alto' ? 'alto' : l.score === 'Medio' ? 'medio' : 'revisar';
+    const noInteresa = l.es_relevante === 0;
     const evalBadge = l.es_relevante === 1 ? '<span class="badge b-si">Nos interesa</span>' :
                       l.es_relevante === 0 ? '<span class="badge b-no">No nos interesa</span>' : '';
     const comentario = l.comentario ? `<div class="comentario">💬 ${l.comentario}</div>` : '';
@@ -80,7 +85,7 @@ app.get('/', (req, res) => {
     const fechaF = l.fallo && l.fallo !== 'No especificada' ?
       `<span class="fecha-ok">${l.fallo}</span>` : '<span class="fecha-nd">No especificada</span>';
 
-    return `<div class="card ${cls}" id="c${l.id}">
+    return `<div class="card ${cls}${noInteresa ? ' no-interesa' : ''}" id="c${l.id}">
       <div class="card-head">
         <div>
           <div class="portal">${l.portal_nombre || ''}</div>
@@ -145,6 +150,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .card.alto{border-left:3px solid #5DCAA5}
 .card.medio{border-left:3px solid #EF9F27}
 .card.revisar{border-left:3px solid #378ADD}
+.card.no-interesa{opacity:0.4;filter:grayscale(30%)}
+.card.no-interesa:hover{opacity:0.75}
 .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;flex-wrap:wrap}
 .portal{font-size:11px;color:#888;margin-bottom:2px}
 .titulo{font-size:14px;font-weight:500}
@@ -172,6 +179,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .cbox textarea{width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:12px;font-family:inherit;height:50px;resize:none;margin-bottom:4px}
 .cbox button{padding:4px 10px;background:#1a1a1a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;margin-right:4px}
 .empty{text-align:center;padding:60px;color:#aaa;font-size:16px}
+.separador-no{border-top:2px dashed #ddd;margin:20px 0;text-align:center;font-size:11px;color:#aaa;padding-top:8px}
 </style>
 </head>
 <body>
@@ -258,13 +266,31 @@ function mostrar() {
     });
   }
 
-  var cards = lista.map(function(l){ return document.getElementById('c'+l.id); }).filter(Boolean);
+  // Ocultar todas las cards primero
   document.querySelectorAll('.card').forEach(function(c){ c.style.display='none'; });
-  cards.forEach(function(c){ c.style.display='block'; });
+  document.querySelectorAll('.separador-no').forEach(function(s){ s.remove(); });
 
   if(lista.length === 0) {
     document.getElementById('lista').innerHTML = '<div class="empty">No hay licitaciones en esta categoría</div>';
+    return;
   }
+
+  // Mostrar cards filtradas
+  var hayNoInteresa = false;
+  lista.forEach(function(l){
+    var card = document.getElementById('c'+l.id);
+    if(card) {
+      card.style.display = 'block';
+      if(l.es_relevante === 0 && !hayNoInteresa) {
+        hayNoInteresa = true;
+        // Insertar separador antes de la primera "no interesa"
+        var sep = document.createElement('div');
+        sep.className = 'separador-no';
+        sep.textContent = '— No nos interesan —';
+        card.parentNode.insertBefore(sep, card);
+      }
+    }
+  });
 }
 
 function evaluar(id, valor) {
@@ -289,17 +315,13 @@ function guardar(id) {
 });
 
 app.get('/reset-portales', (req, res) => {
-  // Eliminar todos los portales de la BD para que se recarguen del codigo
   db.exec('DELETE FROM portales');
   res.send('Portales eliminados de la BD. Reinicia el servidor para recargarlos. <a href="/">Dashboard</a>');
 });
 
 app.get('/limpiar', (req, res) => {
-  // Eliminar todo excepto las del ultimo scan (ultimas 2 horas)
   db.exec("DELETE FROM licitaciones WHERE fecha_deteccion < datetime('now', '-2 hours', 'localtime')");
-  // Eliminar scores Error y No relevante
   db.exec("DELETE FROM licitaciones WHERE score='Error' OR score='No relevante'");
-  // Eliminar duplicados
   db.exec(`DELETE FROM licitaciones WHERE id NOT IN (
     SELECT MAX(id) FROM licitaciones GROUP BY titulo, portal_nombre
   )`);
@@ -308,7 +330,6 @@ app.get('/limpiar', (req, res) => {
 });
 
 app.get('/limpiar-todo', (req, res) => {
-  // Limpieza total - solo ultimas 24 horas
   db.exec("DELETE FROM licitaciones WHERE fecha_deteccion < datetime('now', '-24 hours', 'localtime')");
   db.exec("DELETE FROM licitaciones WHERE score='Error' OR score='No relevante'");
   db.exec(`DELETE FROM licitaciones WHERE id NOT IN (
