@@ -830,11 +830,16 @@ async function analizarMichoacan(url, nombrePortal) {
       try {
         let pdfUrl = null;
 
-        if (lic.bases) {
+        // Siempre llamar a /archivos — el campo bases del índice no es confiable
+        try {
           const archivosResp = await axios.post(API_ARCHIVOS, { cve_proc: String(lic.id) }, { headers: HEADERS_API, timeout: 20000 });
           const docs = archivosResp.data?.documentos || [];
-          const basesDoc = docs.find(d => d.nombre === 'BASES' && d.documento);
+          // Priorizar BASES, luego INVITACION
+          const basesDoc = docs.find(d => d.nombre === 'BASES' && d.documento) ||
+                           docs.find(d => d.nombre === 'INVITACION' && d.documento);
           if (basesDoc) pdfUrl = basesDoc.documento;
+        } catch(e) {
+          console.log(`  Error Michoacán archivos ${lic.id}: ` + e.message.substring(0, 50));
         }
 
         if (pdfUrl) {
