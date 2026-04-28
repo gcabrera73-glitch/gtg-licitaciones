@@ -764,6 +764,134 @@ async function analizarUAN(url, nombrePortal) {
   return resultados;
 }
 
+async function analizarMichoacan(url, nombrePortal) {
+  const resultados = [];
+  const API_LIST = 'https://sip.cadpe.michoacan.gob.mx/api/compramich/procedures/list';
+  const API_ARCHIVOS = 'https://sip.cadpe.michoacan.gob.mx/api/compramich/obtener/procedimientos_publicos/archivos';
+  const palabrasTI = /tecnolog|computo|c[oó]mputo|telecomunicac|internet|red |redes|firewall|switch|router|wifi|cctv|videovigilancia|fibra|noc|soporte|software|servidor|seguridad.inform|licenciamiento|licencias|infraestructura|conectividad|bienes.inform[aá]t|equipos.inform[aá]t|procesamiento.en.equipos/i;
+
+  const HEADERS_API = {
+    'Content-Type': 'application/json',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+    'Origin': 'https://sip.cadpe.michoacan.gob.mx',
+    'Referer': 'https://sip.cadpe.michoacan.gob.mx/CADPE/',
+  };
+
+  try {
+    // Paso 1: obtener total de páginas
+    const primeraResp = await axios.post(API_LIST, { size: 50, page: 1, filters: {} }, { headers: HEADERS_API, timeout: 25000 });
+    const totalPaginas = primeraResp.data?.data?.total_pages || 1;
+    const paginasReales = Math.ceil(totalPaginas * 10 / 50); // ajuste por size=50
+    console.log(`  Michoacán: ${totalPaginas * 10} procedimientos en ${paginasReales} páginas (size=50)`);
+
+    const licitacionesTI = [];
+
+    // Procesar primera página ya obtenida
+    const procesarPagina = (data) => {
+      const items = data?.data?.data || [];
+      for (const item of items) {
+        const fields = item.fields || [];
+        const getField = (key) => fields.find(f => f.key === key)?.value || '';
+        const desc = getField('description');
+        const year = getField('year');
+        if (year !== '2026' && year !== '2025') continue;
+        if (!palabrasTI.test(desc)) continue;
+        const bases = getField('bases') === 'true';
+        licitacionesTI.push({
+          id: item.id,
+          titulo: desc,
+          numero: getField('number_procedure'),
+          dependencia: getField('dependency'),
+          tipo_proc: getField('type_procedure'),
+          bases,
+        });
+      }
+    };
+
+    procesarPagina(primeraResp.data);
+
+    // Paso 2: paginar el resto
+    for (let pagina = 2; pagina <= paginasReales; pagina++) {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const resp = await axios.post(API_LIST, { size: 50, page: pagina, filters: {} }, { headers: HEADERS_API, timeout: 25000 });
+        procesarPagina(resp.data);
+        if (pagina % 5 === 0) console.log(`  Michoacán pág ${pagina}/${paginasReales}: ${licitacionesTI.length} TI acumuladas`);
+      } catch(e) {
+        console.log(`  Error Michoacán pág ${pagina}: ` + e.message.substring(0, 60));
+      }
+    }
+
+    console.log(`  Michoacán total TI encontradas: ${licitacionesTI.length}`);
+
+    // Paso 3: para cada relevante, obtener PDF de bases y extraer fechas
+    for (const lic of licitacionesTI) {
+      await new Promise(r => setTimeout(r, 4000));
+      try {
+        let pdfUrl = null;
+
+        if (lic.bases) {
+          const archivosResp = await axios.post(API_ARCHIVOS, { cve_proc: String(lic.id) }, { headers: HEADERS_API, timeout: 20000 });
+          const docs = archivosResp.data?.documentos || [];
+          const basesDoc = docs.find(d => d.nombre === 'BASES' && d.documento);
+          if (basesDoc) pdfUrl = basesDoc.documento;
+        }
+
+        if (pdfUrl) {
+          await new Promise(r => setTimeout(r, 3000));
+          const contenidoPDF = await fetchContenido(pdfUrl);
+          if (contenidoPDF && contenidoPDF.length > 100) {
+            const respFechas = await llamarIA(PROMPT_DETALLE(pdfUrl, nombrePortal, contenidoPDF), 700);
+            const jsonFechas = limpiarJSON(respFechas);
+            if (jsonFechas) {
+              const detalle = JSON.parse(jsonFechas);
+              const lics = detalle.licitaciones || [detalle];
+              for (const l of lics) {
+                if (!l.titulo || l.score === 'No relevante') continue;
+                console.log(`  Michoacán Fechas [${lic.numero}] - Fallo: ${l.fallo} | Entrega: ${l.fecha_entrega}`);
+                if (licitacionVencida(l)) { console.log('  Vencida Michoacán: ' + lic.titulo.substring(0, 50)); continue; }
+                l.titulo = l.titulo || lic.titulo;
+                l.numero_licitacion = l.numero_licitacion || lic.numero;
+                l.dependencia = l.dependencia || lic.dependencia;
+                l.portal_url = pdfUrl;
+                l.portal_nombre = nombrePortal;
+                l.hash = crypto.createHash('md5').update('michoacan' + lic.id + lic.titulo).digest('hex');
+                resultados.push(l);
+              }
+              continue;
+            }
+          }
+        }
+
+        // Sin PDF o sin fechas
+        console.log(`  Michoacán sin fechas: ${lic.titulo.substring(0, 60)}`);
+        resultados.push({
+          titulo: lic.titulo,
+          dependencia: lic.dependencia,
+          tipo: lic.tipo_proc || 'No determinado',
+          score: 'Medio',
+          marcas: 'Ninguna',
+          junta_aclaraciones: 'No especificada',
+          fecha_entrega: 'No especificada',
+          fallo: 'No especificada',
+          justificacion: 'Licitación TI vigente en Michoacán',
+          numero_licitacion: lic.numero,
+          portal_url: `https://sip.cadpe.michoacan.gob.mx/CADPE/#/procedimientos`,
+          portal_nombre: nombrePortal,
+          hash: crypto.createHash('md5').update('michoacan' + lic.id + lic.titulo).digest('hex')
+        });
+      } catch(e) {
+        console.log(`  Error Michoacán detalle ${lic.id}: ` + e.message.substring(0, 60));
+      }
+    }
+
+    console.log('  ' + nombrePortal + ': ' + resultados.length + ' relevantes vigentes');
+  } catch(e) {
+    console.log('  Error Michoacán: ' + e.message.substring(0, 80));
+  }
+  return resultados;
+}
+
 async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
   if (url.startsWith('COMPRASMX_API:')) {
     const keywords = url.replace('COMPRASMX_API:', '');
@@ -785,6 +913,9 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
 
   const resultados = [];
   try {
+    // Portales con lógica especializada que no requieren fetchContenido primero
+    if (url.includes('cadpe.michoacan.gob.mx')) return await analizarMichoacan(url, nombrePortal);
+
     const contenidoIndice = await fetchContenido(url);
     if (!contenidoIndice) { console.log('  No se pudo acceder a ' + nombrePortal); return []; }
 
