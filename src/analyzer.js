@@ -844,27 +844,50 @@ async function analizarMichoacan(url, nombrePortal) {
 
         if (pdfUrl) {
           await new Promise(r => setTimeout(r, 3000));
+          // Intentar primero con fetchContenido (PDFs con texto)
+          let fechasExtraidas = null;
           const contenidoPDF = await fetchContenido(pdfUrl);
           if (contenidoPDF && contenidoPDF.length > 100) {
             const respFechas = await llamarIA(PROMPT_DETALLE(pdfUrl, nombrePortal, contenidoPDF), 700);
             const jsonFechas = limpiarJSON(respFechas);
-            if (jsonFechas) {
-              const detalle = JSON.parse(jsonFechas);
-              const lics = detalle.licitaciones || [detalle];
-              for (const l of lics) {
-                if (!l.titulo || l.score === 'No relevante') continue;
-                console.log(`  Michoacán Fechas [${lic.numero}] - Fallo: ${l.fallo} | Entrega: ${l.fecha_entrega}`);
-                if (licitacionVencida(l)) { console.log('  Vencida Michoacán: ' + lic.titulo.substring(0, 50)); continue; }
-                l.titulo = l.titulo || lic.titulo;
-                l.numero_licitacion = l.numero_licitacion || lic.numero;
-                l.dependencia = l.dependencia || lic.dependencia;
-                l.portal_url = pdfUrl;
-                l.portal_nombre = nombrePortal;
-                l.hash = crypto.createHash('md5').update('michoacan' + lic.id + lic.titulo).digest('hex');
-                resultados.push(l);
-              }
-              continue;
+            if (jsonFechas) fechasExtraidas = JSON.parse(jsonFechas);
+          }
+          // Si no se pudo leer (PDF escaneado), usar Claude con web_search
+          if (!fechasExtraidas) {
+            console.log(`  Michoacán PDF escaneado, usando Claude: ${pdfUrl.substring(0, 60)}`);
+            const datosClaudeURL = await leerURLconClaude(pdfUrl);
+            if (datosClaudeURL) {
+              fechasExtraidas = {
+                licitaciones: [{
+                  titulo: datosClaudeURL.titulo || lic.titulo,
+                  numero_licitacion: lic.numero,
+                  dependencia: lic.dependencia,
+                  tipo: lic.tipo_proc || 'No determinado',
+                  score: 'Medio',
+                  marcas: 'Ninguna',
+                  junta_aclaraciones: datosClaudeURL.junta_aclaraciones || 'No especificada',
+                  fecha_entrega: datosClaudeURL.fecha_entrega || 'No especificada',
+                  fallo: datosClaudeURL.fallo || 'No especificada',
+                  justificacion: 'Licitación TI vigente en Michoacán'
+                }]
+              };
             }
+          }
+          if (fechasExtraidas) {
+            const lics = fechasExtraidas.licitaciones || [fechasExtraidas];
+            for (const l of lics) {
+              if (!l.titulo || l.score === 'No relevante') continue;
+              console.log(`  Michoacán Fechas [${lic.numero}] - Fallo: ${l.fallo} | Entrega: ${l.fecha_entrega}`);
+              if (licitacionVencida(l)) { console.log('  Vencida Michoacán: ' + lic.titulo.substring(0, 50)); continue; }
+              l.titulo = l.titulo || lic.titulo;
+              l.numero_licitacion = l.numero_licitacion || lic.numero;
+              l.dependencia = l.dependencia || lic.dependencia;
+              l.portal_url = pdfUrl;
+              l.portal_nombre = nombrePortal;
+              l.hash = crypto.createHash('md5').update('michoacan' + lic.id + lic.titulo).digest('hex');
+              resultados.push(l);
+            }
+            continue;
           }
         }
 
