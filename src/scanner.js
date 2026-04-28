@@ -58,11 +58,12 @@ async function ejecutarScan(onProgreso) {
       encontradas++;
       const esRelevante = ['Alto', 'Medio'].includes(resultado.score);
       if (resultado.score === 'Vencida') resultado.score = 'No relevante';
-      const esRevisar = resultado.score === 'Revisar';
 
       try {
-        const existe = db.prepare('SELECT id, junta_aclaraciones, fecha_entrega, fallo FROM licitaciones WHERE hash=?').get(resultado.hash);
+        const existe = db.prepare('SELECT id, junta_aclaraciones, fecha_entrega, fallo, validado, es_relevante FROM licitaciones WHERE hash=?').get(resultado.hash);
+
         if (!existe) {
+          // Nueva licitacion — insertar normalmente
           db.prepare(`INSERT INTO licitaciones
             (portal_url, portal_nombre, titulo, dependencia, tipo, score, marcas,
              junta_aclaraciones, fecha_entrega, fallo, justificacion, hash)
@@ -71,21 +72,49 @@ async function ejecutarScan(onProgreso) {
              @junta_aclaraciones, @fecha_entrega, @fallo, @justificacion, @hash)
           `).run(resultado);
         } else {
-          // Siempre actualizar fechas si el nuevo scan las tiene
-          const tieneFechasNuevas = 
-            (resultado.junta_aclaraciones && resultado.junta_aclaraciones !== 'No especificada') ||
-            (resultado.fecha_entrega && resultado.fecha_entrega !== 'No especificada') ||
-            (resultado.fallo && resultado.fallo !== 'No especificada');
-          if (tieneFechasNuevas) {
-            db.prepare(`UPDATE licitaciones SET 
-              junta_aclaraciones=?, fecha_entrega=?, fallo=?, score=?
-              WHERE hash=?`).run(
-              resultado.junta_aclaraciones, resultado.fecha_entrega, 
-              resultado.fallo, resultado.score, resultado.hash
-            );
+          // Ya existe — solo actualizar fechas SI no fue evaluada manualmente
+          const fueEvaluada = existe.validado === 1 || existe.es_relevante !== null;
+
+          if (!fueEvaluada) {
+            // No evaluada: actualizar fechas y score normalmente
+            const tieneFechasNuevas =
+              (resultado.junta_aclaraciones && resultado.junta_aclaraciones !== 'No especificada') ||
+              (resultado.fecha_entrega && resultado.fecha_entrega !== 'No especificada') ||
+              (resultado.fallo && resultado.fallo !== 'No especificada');
+
+            if (tieneFechasNuevas) {
+              db.prepare(`UPDATE licitaciones SET
+                junta_aclaraciones=?, fecha_entrega=?, fallo=?, score=?
+                WHERE hash=?`).run(
+                resultado.junta_aclaraciones, resultado.fecha_entrega,
+                resultado.fallo, resultado.score, resultado.hash
+              );
+            }
+          } else {
+            // Ya fue evaluada — solo actualizar fechas si mejoran, NUNCA tocar score ni evaluacion
+            const tieneFechasNuevas =
+              (resultado.junta_aclaraciones && resultado.junta_aclaraciones !== 'No especificada' &&
+               (!existe.junta_aclaraciones || existe.junta_aclaraciones === 'No especificada')) ||
+              (resultado.fecha_entrega && resultado.fecha_entrega !== 'No especificada' &&
+               (!existe.fecha_entrega || existe.fecha_entrega === 'No especificada')) ||
+              (resultado.fallo && resultado.fallo !== 'No especificada' &&
+               (!existe.fallo || existe.fallo === 'No especificada'));
+
+            if (tieneFechasNuevas) {
+              db.prepare(`UPDATE licitaciones SET
+                junta_aclaraciones=CASE WHEN junta_aclaraciones='No especificada' OR junta_aclaraciones IS NULL THEN ? ELSE junta_aclaraciones END,
+                fecha_entrega=CASE WHEN fecha_entrega='No especificada' OR fecha_entrega IS NULL THEN ? ELSE fecha_entrega END,
+                fallo=CASE WHEN fallo='No especificada' OR fallo IS NULL THEN ? ELSE fallo END
+                WHERE hash=?`).run(
+                resultado.junta_aclaraciones, resultado.fecha_entrega,
+                resultado.fallo, resultado.hash
+              );
+            }
           }
         }
-      } catch(e) {}
+      } catch(e) {
+        console.log('  Error BD: ' + e.message.substring(0, 60));
+      }
 
       if (esRelevante) {
         relevantes++;
