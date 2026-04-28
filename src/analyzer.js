@@ -472,7 +472,6 @@ async function analizarCDMX(url, nombrePortal) {
       const fechaObj = fechaPropuesta !== 'No especificada' ? new Date(fechaPropuesta) : null;
       if (fechaObj && fechaObj < HOY) { console.log('  Vencida CDMX: ' + titulo.substring(0, 60)); continue; }
       console.log('  CDMX TI vigente: ' + titulo.substring(0, 60));
-      console.log('  Fechas CDMX - Propuestas: ' + fechaPropuesta);
       resultados.push({
         titulo, dependencia: convocante, tipo: 'No determinado', score: 'Medio', marcas: 'Ninguna',
         junta_aclaraciones: 'No especificada', fecha_entrega: fechaPropuesta, fallo: 'No especificada',
@@ -486,59 +485,39 @@ async function analizarCDMX(url, nombrePortal) {
   return resultados;
 }
 
-
 async function analizarDurango(url, nombrePortal) {
   const resultados = [];
   try {
-    // Leer índice de procedimientos
     const response = await axios.get(url, { timeout: 25000, headers: HEADERS, maxRedirects: 5, responseType: 'arraybuffer' });
     const html = Buffer.from(response.data).toString('utf-8');
-
-    // Extraer IDs de licitaciones del índice — patrón /ProcedimientosDeContratacion/NNNN
     const idRegex = /ProcedimientosDeContratacion\/(d+)/g;
     const ids = [];
     let m;
     while ((m = idRegex.exec(html)) !== null) {
       if (!ids.includes(m[1])) ids.push(m[1]);
     }
-
     const palabrasTI = /tecnolog|computo|telecomunicac|internet|red |redes|firewall|switch|router|wifi|cctv|videovigilancia|fibra|noc|soporte.tecnico|infraestructura.*red|licencias|software|servidor|seguridad.informatica|satelital|c5|comunicaciones|conectividad/i;
-
     console.log('  Durango procedimientos encontrados: ' + ids.length);
-
     for (const id of ids) {
       await new Promise(r => setTimeout(r, 2000));
       try {
         const detUrl = 'https://comprasestatal.durango.gob.mx/consulta/ProcedimientosDeContratacion/' + id;
         const detResp = await axios.get(detUrl, { timeout: 20000, headers: HEADERS, responseType: 'arraybuffer' });
         const detHtml = Buffer.from(detResp.data).toString('utf-8');
-
-        // Extraer descripción
         const descMatch = detHtml.match(/Descripci[oó]n:[\s\S]*?<\/dt>[\s\S]*?<dd[^>]*>\s*([^<]{10,300})\s*<\/dd>/i);
         const titulo = descMatch ? descMatch[1].trim() : '';
         if (!titulo || !palabrasTI.test(titulo)) continue;
-
-        // Extraer fechas directamente del HTML
         const juntaMatch = detHtml.match(/Junta de[\s\S]*?Aclaraciones:[\s\S]*?<dd[^>]*>\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/i);
         const aperturaMatch = detHtml.match(/Apertura de[\s\S]*?Proposiciones:[\s\S]*?<dd[^>]*>\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/i);
         const falloMatch = detHtml.match(/Evento de[\s\S]*?Fallo:[\s\S]*?<dd[^>]*>\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/i);
         const depMatch = detHtml.match(/Unidad Compradora:[\s\S]*?<\/dt>[\s\S]*?<dd[^>]*>[\s\S]*?-\s*([^<]{5,100})<\/dd>/i);
-
         const junta = juntaMatch ? juntaMatch[1] : 'No especificada';
         const apertura = aperturaMatch ? aperturaMatch[1] : 'No especificada';
         const fallo = falloMatch ? falloMatch[1] : 'No especificada';
         const dependencia = depMatch ? depMatch[1].trim() : nombrePortal;
-
-        // Verificar si está vencida
         const fechaRef = parsearFecha(fallo) || parsearFecha(apertura);
-        if (fechaRef && fechaRef < HOY) {
-          console.log('  Vencida Durango: ' + titulo.substring(0, 60));
-          continue;
-        }
-
+        if (fechaRef && fechaRef < HOY) { console.log('  Vencida Durango: ' + titulo.substring(0, 60)); continue; }
         console.log('  Durango TI vigente: ' + titulo.substring(0, 60));
-        console.log('  Fechas Durango - Fallo: ' + fallo + ' | Apertura: ' + apertura);
-
         resultados.push({
           titulo, dependencia, tipo: 'No determinado', score: 'Medio', marcas: 'Ninguna',
           junta_aclaraciones: junta, fecha_entrega: apertura, fallo,
@@ -558,19 +537,13 @@ async function analizarGuadalajara(url, nombrePortal) {
   try {
     const response = await axios.get(url, { timeout: 25000, headers: HEADERS, maxRedirects: 5, responseType: 'arraybuffer' });
     const html = Buffer.from(response.data).toString('utf-8');
-
     const palabrasTI = /tecnolog|computo|telecomunicac|internet|red |redes|firewall|switch|router|wifi|cctv|videovigilancia|fibra|noc|soporte|software|servidor|seguridad|satelital|c5|conectividad|repetidores|plataforma|audiovisual|monitoreo|infraestructura/i;
-
-    // Dividir por filas de tabla
     const filas = html.split('<tr').slice(1);
     const licitacionesTI = [];
-
     for (const fila of filas) {
       const textoFila = fila.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
       if (!palabrasTI.test(textoFila)) continue;
       if (textoFila.length < 20) continue;
-
-      // Extraer título del span
       const spanMatch = fila.match(/<span[^>]*>([^<]{30,400})<\/span>/i);
       if (!spanMatch) continue;
       const titulo = spanMatch[1]
@@ -582,29 +555,19 @@ async function analizarGuadalajara(url, nombrePortal) {
         .replace(/&Ntilde;/g, 'Ñ').replace(/&ntilde;/g, 'ñ')
         .replace(/&quot;/g, '"').replace(/&#[0-9]+;/g, '').trim().substring(0, 250);
       if (!titulo || titulo.length < 20) continue;
-
-      // Filtrar licitaciones de 2025 o anteriores
       const añoMatch = titulo.match(/-(20\d{2})[^\d]/);
       if (añoMatch && parseInt(añoMatch[1]) < 2026) continue;
-
-      // Extraer link al PDF de convocatoria en esa fila
       const pdfMatch = fila.match(/href=["']([^"']*\/sites\/default\/files\/uploads\/[^"']*\.pdf[^"']*)/i);
       const pdfUrl = pdfMatch ? ('https://transparencia.guadalajara.gob.mx' + pdfMatch[1]) : null;
-
       if (!pdfUrl) continue;
-      if (licitacionesTI.some(l => l.pdfUrl === pdfUrl)) continue; // deduplicar
-
+      if (licitacionesTI.some(l => l.pdfUrl === pdfUrl)) continue;
       licitacionesTI.push({ titulo, pdfUrl });
     }
-
     console.log('  Guadalajara licitaciones TI encontradas: ' + licitacionesTI.length);
-
     for (const { titulo, pdfUrl } of licitacionesTI) {
       await new Promise(r => setTimeout(r, 8000));
       try {
         const contenidoPDF = await fetchContenido(pdfUrl);
-        
-        // Si el PDF tiene texto, extraer fechas
         if (contenidoPDF && contenidoPDF.length > 100) {
           const respFechas = await llamarIA(PROMPT_DETALLE(pdfUrl, nombrePortal, contenidoPDF), 700);
           const jsonFechas = limpiarJSON(respFechas);
@@ -623,8 +586,6 @@ async function analizarGuadalajara(url, nombrePortal) {
             continue;
           }
         }
-
-        // PDF escaneado o sin texto — agregar sin fechas con score Medio
         console.log('  Guadalajara sin fechas (PDF escaneado): ' + titulo.substring(0, 60));
         resultados.push({
           titulo, dependencia: nombrePortal, tipo: 'No determinado', score: 'Medio', marcas: 'Ninguna',
@@ -639,6 +600,102 @@ async function analizarGuadalajara(url, nombrePortal) {
   } catch(e) { console.log('  Error Guadalajara: ' + e.message.substring(0, 80)); }
   return resultados;
 }
+
+async function analizarJalisco(url, nombrePortal) {
+  const resultados = [];
+  const palabrasTI = /tecnolog|computo|telecomunicac|internet|red |redes|firewall|switch|router|wifi|cctv|videovigilancia|fibra|noc|soporte|software|servidor|seguridad|satelital|conectividad|licenciamiento|licencias|infraestructura|audiovisual|mantenimiento.*computo|mantenimiento.*red/i;
+
+  try {
+    const licitacionesTI = [];
+    const TOTAL_PAGINAS = 18;
+
+    for (let pagina = 1; pagina <= TOTAL_PAGINAS; pagina++) {
+      const paginaUrl = pagina === 1
+        ? 'https://compras.jalisco.gob.mx/requisition/tree?consolidated_create_date=2026'
+        : `https://compras.jalisco.gob.mx/requisition/tree/page/${pagina}?consolidated_create_date=2026`;
+
+      try {
+        await new Promise(r => setTimeout(r, 3000));
+        const response = await axios.get(paginaUrl, { timeout: 25000, headers: HEADERS, maxRedirects: 5, responseType: 'arraybuffer' });
+        const html = Buffer.from(response.data).toString('utf-8');
+
+        const filas = html.split('<tr').slice(1);
+        for (const fila of filas) {
+          const textoFila = fila.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+          if (!palabrasTI.test(textoFila)) continue;
+
+          const descMatch = fila.match(/id="description-cell"[\s\S]*?<span>([^<]{10,300})<\/span>/i);
+          if (!descMatch) continue;
+          const titulo = descMatch[1].replace(/&quot;/g, '"').replace(/&#[0-9]+;/g, '').trim();
+          if (!titulo || titulo.length < 10) continue;
+
+          const etapaMatch = fila.match(/id="stage-cell"[\s\S]*?<span>([^<]+)<\/span>/i);
+          const etapa = etapaMatch ? etapaMatch[1].trim() : '';
+          if (/fallo|cancelad|desierta/i.test(etapa)) continue;
+
+          const numMatch = fila.match(/id="code-cell"[\s\S]*?<span>([^<]+)<\/span>/i);
+          const numero = numMatch ? numMatch[1].trim() : '';
+
+          const pdfMatch = fila.match(/href="(\/requisition\/doc\/download\/[^"]+)"/i);
+          const pdfUrl = pdfMatch ? 'https://compras.jalisco.gob.mx' + pdfMatch[1] : null;
+          if (!pdfUrl) continue;
+          if (licitacionesTI.some(l => l.pdfUrl === pdfUrl)) continue;
+
+          licitacionesTI.push({ titulo, numero, pdfUrl, etapa });
+        }
+        console.log(`  Jalisco pagina ${pagina}/${TOTAL_PAGINAS}: ${licitacionesTI.length} TI acumuladas`);
+      } catch(e) {
+        console.log(`  Error Jalisco pagina ${pagina}: ` + e.message.substring(0, 60));
+      }
+    }
+
+    console.log(`  Jalisco total licitaciones TI encontradas: ${licitacionesTI.length}`);
+
+    for (const { titulo, numero, pdfUrl, etapa } of licitacionesTI) {
+      await new Promise(r => setTimeout(r, 6000));
+      try {
+        const contenidoPDF = await fetchContenido(pdfUrl);
+        if (contenidoPDF && contenidoPDF.length > 100) {
+          const respFechas = await llamarIA(PROMPT_DETALLE(pdfUrl, nombrePortal, contenidoPDF), 700);
+          const jsonFechas = limpiarJSON(respFechas);
+          if (jsonFechas) {
+            const detalle = JSON.parse(jsonFechas);
+            const lics = detalle.licitaciones || [detalle];
+            for (const lic of lics) {
+              if (!lic.titulo || lic.score === 'No relevante') continue;
+              console.log(`  Jalisco Fechas [${numero}] - Fallo: ${lic.fallo} | Entrega: ${lic.fecha_entrega}`);
+              if (licitacionVencida(lic)) { console.log('  Vencida Jalisco: ' + titulo.substring(0, 50)); continue; }
+              lic.titulo = lic.titulo || titulo;
+              lic.numero_licitacion = lic.numero_licitacion || numero;
+              lic.portal_url = pdfUrl;
+              lic.portal_nombre = nombrePortal;
+              lic.hash = crypto.createHash('md5').update(pdfUrl + titulo).digest('hex');
+              resultados.push(lic);
+            }
+            continue;
+          }
+        }
+        // PDF sin texto legible
+        console.log('  Jalisco sin fechas (PDF escaneado): ' + titulo.substring(0, 60));
+        resultados.push({
+          titulo, dependencia: nombrePortal, tipo: 'No determinado', score: 'Medio', marcas: 'Ninguna',
+          junta_aclaraciones: 'No especificada', fecha_entrega: 'No especificada', fallo: 'No especificada',
+          justificacion: `Licitacion TI vigente en Jalisco - etapa: ${etapa}`,
+          numero_licitacion: numero, portal_url: pdfUrl, portal_nombre: nombrePortal,
+          hash: crypto.createHash('md5').update(pdfUrl + titulo).digest('hex')
+        });
+      } catch(e) {
+        console.log('  Error Jalisco PDF: ' + e.message.substring(0, 60));
+      }
+    }
+
+    console.log('  ' + nombrePortal + ': ' + resultados.length + ' relevantes vigentes');
+  } catch(e) {
+    console.log('  Error Jalisco: ' + e.message.substring(0, 80));
+  }
+  return resultados;
+}
+
 async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
   if (url.startsWith('COMPRASMX_API:')) {
     const keywords = url.replace('COMPRASMX_API:', '');
@@ -668,6 +725,7 @@ async function analizarPortal(url, nombrePortal, criteriosAprendizaje) {
     if (url.includes('licitaciones.puebla.gob.mx')) return await analizarPuebla(url, nombrePortal);
     if (url.includes('concursodigital.finanzas.cdmx.gob.mx')) return await analizarCDMX(url, nombrePortal);
     if (url.includes('comprasestatal.durango.gob.mx')) return await analizarDurango(url, nombrePortal);
+    if (url.includes('compras.jalisco.gob.mx')) return await analizarJalisco(url, nombrePortal);
     if (url.includes('transparencia.guadalajara.gob.mx')) return await analizarGuadalajara(url, nombrePortal);
 
     const respuestaIndice = await llamarIA(PROMPT_INDICE(url, nombrePortal, contenidoIndice, criteriosAprendizaje), 1500);

@@ -26,7 +26,7 @@ const PORTALES = [
   { url: 'https://compranet.guerrero.gob.mx/expedientespublicos.aspx', nombre: 'Guerrero', categoria: 'Estado' },
   { url: 'https://eoficialia.hidalgo.gob.mx/LICITACIONES/VISTAS/WebFrmLC004.aspx', nombre: 'Hidalgo', categoria: 'Estado' },
   { url: 'https://oficialiamayor.hidalgo.gob.mx/Licitaciones', nombre: 'Hidalgo Oficialía Mayor', categoria: 'Estado' },
-  { url: 'https://compras.jalisco.gob.mx/requisition/tree?group=007', nombre: 'Jalisco TI', categoria: 'Estado' },
+  { url: 'https://compras.jalisco.gob.mx/requisition/tree?consolidated_create_date=2026', nombre: 'Jalisco TI', categoria: 'Estado' },
   { url: 'https://transparencia.guadalajara.gob.mx/licitaciones2026', nombre: 'Guadalajara Municipio', categoria: 'Municipio' },
   { url: 'https://sip.cadpe.michoacan.gob.mx/CADPE/#/procedimientos', nombre: 'Michoacán', categoria: 'Estado' },
   { url: 'https://compras.morelos.gob.mx/licitaciones-2025', nombre: 'Morelos', categoria: 'Estado' },
