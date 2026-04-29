@@ -75,21 +75,22 @@ app.get('/', (req, res) => {
   const cards = lics.map(l => {
     const cls = l.score === 'Alto' ? 'alto' : l.score === 'Medio' ? 'medio' : 'revisar';
     const noInteresa = l.es_relevante === 0;
+    const san = s => (s || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const evalBadge = l.es_relevante === 1 ? '<span class="badge b-si">Nos interesa</span>' :
                       l.es_relevante === 0 ? '<span class="badge b-no">No nos interesa</span>' : '';
-    const comentario = l.comentario ? `<div class="comentario">💬 ${l.comentario}</div>` : '';
+    const comentario = l.comentario ? `<div class="comentario">💬 ${san(l.comentario)}</div>` : '';
     const fechaJ = l.junta_aclaraciones && l.junta_aclaraciones !== 'No especificada' ?
-      `<span class="fecha-ok">${l.junta_aclaraciones}</span>` : '<span class="fecha-nd">No especificada</span>';
+      `<span class="fecha-ok">${san(l.junta_aclaraciones)}</span>` : '<span class="fecha-nd">No especificada</span>';
     const fechaE = l.fecha_entrega && l.fecha_entrega !== 'No especificada' ?
-      `<span class="fecha-ok">${l.fecha_entrega}</span>` : '<span class="fecha-nd">No especificada</span>';
+      `<span class="fecha-ok">${san(l.fecha_entrega)}</span>` : '<span class="fecha-nd">No especificada</span>';
     const fechaF = l.fallo && l.fallo !== 'No especificada' ?
-      `<span class="fecha-ok">${l.fallo}</span>` : '<span class="fecha-nd">No especificada</span>';
+      `<span class="fecha-ok">${san(l.fallo)}</span>` : '<span class="fecha-nd">No especificada</span>';
 
     return `<div class="card ${cls}${noInteresa ? ' no-interesa' : ''}" id="c${l.id}">
       <div class="card-head">
         <div>
-          <div class="portal">${l.portal_nombre || ''}</div>
-          <div class="titulo">${l.titulo || ''}</div>
+          <div class="portal">${san(l.portal_nombre)}</div>
+          <div class="titulo">${san(l.titulo)}</div>
         </div>
         <div class="badges">
           <span class="badge b-${cls}">${l.score}</span>
@@ -98,13 +99,13 @@ app.get('/', (req, res) => {
         </div>
       </div>
       <div class="grid">
-        <div class="field"><div class="lbl">Dependencia</div><div class="val">${l.dependencia || ''}</div></div>
-        <div class="field"><div class="lbl">Marcas</div><div class="val">${l.marcas || 'Ninguna'}</div></div>
+        <div class="field"><div class="lbl">Dependencia</div><div class="val">${san(l.dependencia)}</div></div>
+        <div class="field"><div class="lbl">Marcas</div><div class="val">${san(l.marcas) || 'Ninguna'}</div></div>
         <div class="field"><div class="lbl">Junta aclaraciones</div><div class="val">${fechaJ}</div></div>
         <div class="field"><div class="lbl">Entrega propuestas</div><div class="val">${fechaE}</div></div>
         <div class="field"><div class="lbl">Fallo</div><div class="val">${fechaF}</div></div>
       </div>
-      <div class="just">${l.justificacion || ''}</div>
+      <div class="just">${san(l.justificacion)}</div>
       ${comentario}
       <div class="actions">
         <button onclick="evaluar(${l.id},1)" class="btn-si">✓ Nos interesa</button>

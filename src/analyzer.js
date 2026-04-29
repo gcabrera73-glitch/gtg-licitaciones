@@ -558,7 +558,8 @@ async function analizarGuadalajara(url, nombrePortal) {
       const añoMatch = titulo.match(/-(20\d{2})[^\d]/);
       if (añoMatch && parseInt(añoMatch[1]) < 2026) continue;
       const pdfMatch = fila.match(/href=["']([^"']*\/sites\/default\/files\/uploads\/[^"']*\.pdf[^"']*)/i);
-      const pdfUrl = pdfMatch ? ('https://transparencia.guadalajara.gob.mx' + pdfMatch[1]) : null;
+      const pdfRaw = pdfMatch ? pdfMatch[1] : null;
+      const pdfUrl = pdfRaw ? (pdfRaw.startsWith('http') ? pdfRaw : 'https://transparencia.guadalajara.gob.mx' + pdfRaw) : null;
       if (!pdfUrl) continue;
       if (licitacionesTI.some(l => l.pdfUrl === pdfUrl)) continue;
       licitacionesTI.push({ titulo, pdfUrl });
